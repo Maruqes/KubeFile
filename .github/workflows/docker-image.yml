@@ -18,23 +18,18 @@ jobs:
         username: ${{ secrets.GHCR_USER }}
         password: ${{ secrets.GHCR_TOKEN }}
 
-    # Build Gateway (context = root, Dockerfile apontado)
     - name: Build and Push Gateway
+      env:
+        OWNER: ${{ toLower(github.repository_owner) }}
+        TAG:   ${{ toLower(github.sha) }}
       run: |
-        # GITHUB_REPOSITORY_OWNER e GITHUB_SHA já vêm como env vars
-        OWNER="${GITHUB_REPOSITORY_OWNER,,}"   # shell faz lowercase
-        TAG="${GITHUB_SHA,,}"
         IMAGE="ghcr.io/${OWNER}/url-gateway:${TAG}"
-    
         docker build \
           -f services/gateway/Dockerfile \
           -t "$IMAGE" \
           .
-    
         docker push "$IMAGE"
-
-
-    
+        
     # Build Shortener (idem)
     - name: Build and Push Shortener
       run: |
@@ -74,9 +69,11 @@ jobs:
           shortener=ghcr.io/${OWNER}/url-shortener:${TAG} --record
 
     - name: Deploy Gateway
+      env:
+        OWNER: ${{ toLower(github.repository_owner) }}
+        TAG:   ${{ toLower(github.sha) }}
       run: |
-        OWNER="${GITHUB_REPOSITORY_OWNER,,}"
-        TAG="${GITHUB_SHA,,}"
         kubectl set image deployment/gateway \
           gateway=ghcr.io/${OWNER}/url-gateway:${TAG} --record
+
 
