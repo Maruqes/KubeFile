@@ -20,24 +20,19 @@ jobs:
 
     # Build Gateway (context = root, Dockerfile apontado)
     - name: Build and Push Gateway
-      env:
-        REPO: ${{ github.repository }}    # ex: "owner/repo"
-        SHA:  ${{ github.sha }}
       run: |
-        # extrai e normaliza o owner
-        OWNER="${REPO%%/*}"       # fica só com "owner"
-        OWNER="${OWNER,,}"        # lowercase
-        TAG="${SHA,,}"            # lowercase
-    
+        # GITHUB_REPOSITORY_OWNER e GITHUB_SHA já vêm como env vars
+        OWNER="${GITHUB_REPOSITORY_OWNER,,}"   # shell faz lowercase
+        TAG="${GITHUB_SHA,,}"
         IMAGE="ghcr.io/${OWNER}/url-gateway:${TAG}"
     
-        # build com contexto na raiz (onde estão go.mod/go.sum)
         docker build \
           -f services/gateway/Dockerfile \
           -t "$IMAGE" \
           .
     
         docker push "$IMAGE"
+
 
     
     # Build Shortener (idem)
@@ -80,7 +75,8 @@ jobs:
 
     - name: Deploy Gateway
       run: |
-        OWNER="${{ github.repository_owner,, }}"
-        TAG="${{ github.sha,, }}"
+        OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+        TAG="${GITHUB_SHA,,}"
         kubectl set image deployment/gateway \
           gateway=ghcr.io/${OWNER}/url-gateway:${TAG} --record
+
