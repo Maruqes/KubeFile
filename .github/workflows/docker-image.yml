@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      OWNER: teuusername    # em lowercase, literal
+      OWNER: maruqes
     outputs:
       gateway_image: ${{ steps.set-images.outputs.gateway_image }}
       shortener_image: ${{ steps.set-images.outputs.shortener_image }}
