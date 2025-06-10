@@ -79,5 +79,5 @@ jobs:
           ssh target-server << 'EOF'
             echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S docker pull $GATEWAY_IMAGE
             echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S docker pull $SHORTENER_IMAGE
-            echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S k3s kubectl apply -f /home/sftp/workspace/k8s/
+            echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S k3s kubectl apply -f /home/sftp/KubeFile/k8s/
           EOF
