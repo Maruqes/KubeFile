@@ -20,14 +20,25 @@ jobs:
 
     # Build Gateway (context = root, Dockerfile apontado)
     - name: Build and Push Gateway
+      env:
+        REPO: ${{ github.repository }}    # ex: "owner/repo"
+        SHA:  ${{ github.sha }}
       run: |
-        OWNER="${GITHUB_REPOSITORY_OWNER,,}"     # owner em lowercase
-        TAG="${GITHUB_SHA,,}"                    # SHA em lowercase
+        # extrai e normaliza o owner
+        OWNER="${REPO%%/*}"       # fica só com "owner"
+        OWNER="${OWNER,,}"        # lowercase
+        TAG="${SHA,,}"            # lowercase
+    
         IMAGE="ghcr.io/${OWNER}/url-gateway:${TAG}"
+    
+        # build com contexto na raiz (onde estão go.mod/go.sum)
         docker build \
-          -f services/gateway/Dockerfile \     # usa o Dockerfile do serviço
-          -t "$IMAGE" .                        # contexto = raiz, lá estão go.mod/go.sum
+          -f services/gateway/Dockerfile \
+          -t "$IMAGE" \
+          .
+    
         docker push "$IMAGE"
+
     
     # Build Shortener (idem)
     - name: Build and Push Shortener
