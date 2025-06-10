@@ -21,14 +21,18 @@ jobs:
     # Build Gateway
     - name: Build and Push Gateway
       run: |
-        docker build -t ghcr.io/${{ github.repository_owner }}/url-gateway:${{ github.sha }} ./services/gateway
-        docker push ghcr.io/${{ github.repository_owner }}/url-gateway:${{ github.sha }}
+        # Convert SHA to lowercase
+        LOWERCASE_SHA=$(echo "${{ github.sha }}" | tr '[:upper:]' '[:lower:]')
+        docker build -t ghcr.io/${{ github.repository_owner }}/url-gateway:$LOWERCASE_SHA ./services/gateway
+        docker push ghcr.io/${{ github.repository_owner }}/url-gateway:$LOWERCASE_SHA
 
     # Build Shortener
     - name: Build and Push Shortener
       run: |
-        docker build -t ghcr.io/${{ github.repository_owner }}/url-shortener:${{ github.sha }} ./services/shortener
-        docker push ghcr.io/${{ github.repository_owner }}/url-shortener:${{ github.sha }}
+        # Convert SHA to lowercase
+        LOWERCASE_SHA=$(echo "${{ github.sha }}" | tr '[:upper:]' '[:lower:]')
+        docker build -t ghcr.io/${{ github.repository_owner }}/url-shortener:$LOWERCASE_SHA ./services/shortener
+        docker push ghcr.io/${{ github.repository_owner }}/url-shortener:$LOWERCASE_SHA
 
   deploy:
     runs-on: ubuntu-latest
@@ -47,14 +51,16 @@ jobs:
 
     - name: Deploy Shortener
       run: |
+        # Usar o mesmo SHA em minúsculas
+        LOWERCASE_SHA=$(echo "${{ github.sha }}" | tr '[:upper:]' '[:lower:]')
         kubectl set image deployment/shortener \
-          shortener=ghcr.io/${{ github.repository_owner }}/url-shortener:${{ github.sha }} \
+          shortener=ghcr.io/${{ github.repository_owner }}/url-shortener:$LOWERCASE_SHA \
           --record
-      if: ${{ always() }}
 
     - name: Deploy Gateway
       run: |
+        # Usar o mesmo SHA em minúsculas
+        LOWERCASE_SHA=$(echo "${{ github.sha }}" | tr '[:upper:]' '[:lower:]')
         kubectl set image deployment/gateway \
-          gateway=ghcr.io/${{ github.repository_owner }}/url-gateway:${{ github.sha }} \
+          gateway=ghcr.io/${{ github.repository_owner }}/url-gateway:$LOWERCASE_SHA \
           --record
-      if: ${{ always() }}
