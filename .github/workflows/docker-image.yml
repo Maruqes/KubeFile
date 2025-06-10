@@ -6,13 +6,10 @@ on:
       - main
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     env:
       OWNER: maruqes
-    outputs:
-      gateway_image: ${{ steps.set-images.outputs.gateway_image }}
-      shortener_image: ${{ steps.set-images.outputs.shortener_image }}
 
     steps:
       - name: Fazer checkout do código
@@ -53,28 +50,18 @@ jobs:
             ghcr.io/${{ env.OWNER }}/shortener:latest
             ghcr.io/${{ env.OWNER }}/shortener:${{ github.sha }}
 
-      - id: set-images
-        name: Definir outputs das imagens
+      - name: Definir variáveis de ambiente para deploy
         run: |
-          echo "gateway_image=ghcr.io/${{ env.OWNER }}/gateway:${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "shortener_image=ghcr.io/${{ env.OWNER }}/shortener:${{ github.sha }}" >> $GITHUB_OUTPUT
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Fazer checkout do código
-        uses: actions/checkout@v3
+          echo "GATEWAY_IMAGE=ghcr.io/${{ env.OWNER }}/gateway:${{ github.sha }}" >> $GITHUB_ENV
+          echo "SHORTENER_IMAGE=ghcr.io/${{ env.OWNER }}/shortener:${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Carregar chave SSH no agente
         uses: webfactory/ssh-agent@v0.5.4
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # se usares passphrase na chave, descomenta a linha abaixo
-          # ssh-passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          # ssh-passphrase: ${{ secrets.SSH_PASSPHRASE }}  # se a tua chave tiver passphrase
 
-      - name: Configurar SSH com ProxyCommand e ignorar host key
+      - name: Configurar SSH (ProxyCommand + ignorar host key)
         run: |
           mkdir -p ~/.ssh
           cat << 'EOF' > ~/.ssh/config
@@ -87,8 +74,10 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Fazer deploy no servidor
+      - name: Fazer deploy via SSH
         run: |
-          ssh target-server "echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S docker pull ${{ needs.build.outputs.gateway_image }}"
-          ssh target-server "echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S docker pull ${{ needs.build.outputs.shortener_image }}"
-          ssh target-server "echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S k3s kubectl apply -f /home/sftp/workspace/k8s/"
+          ssh target-server << 'EOF'
+            echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S docker pull $GATEWAY_IMAGE
+            echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S docker pull $SHORTENER_IMAGE
+            echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S k3s kubectl apply -f /home/sftp/workspace/k8s/
+          EOF
