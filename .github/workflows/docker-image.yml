@@ -84,6 +84,3 @@ jobs:
         TAG="${{ github.sha,, }}"
         kubectl set image deployment/gateway \
           gateway=ghcr.io/${OWNER}/url-gateway:${TAG} --record
-
-
-  
