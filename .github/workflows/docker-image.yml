@@ -58,15 +58,32 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+  
     steps:
-      - name: Disparar deploy via SSH
-        uses: appleboy/ssh-action@v0.1.6
+      - uses: actions/checkout@v3
+  
+      - name: Carregar chave SSH no agente
+        uses: webfactory/ssh-agent@v0.5.4
         with:
-          host: ${{ secrets.HOME_SERVER_HOST }}
-          username: ${{ secrets.HOME_SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          script: |
-            docker pull $GATEWAY_IMAGE
-            docker pull $SHORTENER_IMAGE
-            kubectl --kubeconfig=/home/${{ secrets.HOME_SERVER_USER }}/.kube/config apply -f k8s/
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # ssh-passphrase: ${{ secrets.SSH_PASSPHRASE }}   # se aplicável
+  
+      - name: Definir ProxyCommand no SSH
+        run: |
+          mkdir -p ~/.ssh
+          cat << 'EOF' >> ~/.ssh/config
+          Host target-server
+            HostName sftp
+            User sftp
+            ProxyCommand openssl s_client -connect maruqes.com:10512 -servername sftp.maruqes.com -quiet
+          EOF
+          chmod 600 ~/.ssh/config
+  
+      - name: Executar deploy no servidor
+        run: |
+          ssh target-server "
+            docker pull $GATEWAY_IMAGE &&
+            docker pull $SHORTENER_IMAGE &&
+            kubectl --kubeconfig=/home/sftp/.kube/config apply -f k8s/
+          "
+  
