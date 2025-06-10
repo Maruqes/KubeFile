@@ -18,24 +18,27 @@ jobs:
         username: ${{ secrets.GHCR_USER }}
         password: ${{ secrets.GHCR_TOKEN }}
 
-    # Build Gateway
+    # Build Gateway (context = root, Dockerfile apontado)
     - name: Build and Push Gateway
       run: |
         OWNER="${GITHUB_REPOSITORY_OWNER,,}"     # owner em lowercase
         TAG="${GITHUB_SHA,,}"                    # SHA em lowercase
         IMAGE="ghcr.io/${OWNER}/url-gateway:${TAG}"
-        docker build -t "$IMAGE" ./services/gateway
+        docker build \
+          -f services/gateway/Dockerfile \     # usa o Dockerfile do serviço
+          -t "$IMAGE" .                        # contexto = raiz, lá estão go.mod/go.sum
         docker push "$IMAGE"
     
-    # Build Shortener
+    # Build Shortener (idem)
     - name: Build and Push Shortener
       run: |
-        OWNER="${GITHUB_REPOSITORY_OWNER,,}"     # owner em lowercase
-        TAG="${GITHUB_SHA,,}"                    # SHA em lowercase
+        OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+        TAG="${GITHUB_SHA,,}"
         IMAGE="ghcr.io/${OWNER}/url-shortener:${TAG}"
-        docker build -t "$IMAGE" ./services/shortener
+        docker build \
+          -f services/shortener/Dockerfile \
+          -t "$IMAGE" .
         docker push "$IMAGE"
-
 
   deploy:
     runs-on: ubuntu-latest
@@ -54,16 +57,16 @@ jobs:
 
     - name: Deploy Shortener
       run: |
-        # Usar o mesmo SHA em minúsculas
-        LOWERCASE_SHA=$(echo "${{ github.sha }}" | tr '[:upper:]' '[:lower:]')
+        OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+        TAG="${GITHUB_SHA,,}"
         kubectl set image deployment/shortener \
-          shortener=ghcr.io/${{ github.repository_owner }}/url-shortener:$LOWERCASE_SHA \
+          shortener=ghcr.io/${OWNER}/url-shortener:${TAG} \
           --record
 
     - name: Deploy Gateway
       run: |
-        # Usar o mesmo SHA em minúsculas
-        LOWERCASE_SHA=$(echo "${{ github.sha }}" | tr '[:upper:]' '[:lower:]')
+        OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+        TAG="${GITHUB_SHA,,}"
         kubectl set image deployment/gateway \
-          gateway=ghcr.io/${{ github.repository_owner }}/url-gateway:$LOWERCASE_SHA \
+          gateway=ghcr.io/${OWNER}/url-gateway:${TAG} \
           --record
