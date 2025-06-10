@@ -49,5 +49,5 @@ jobs:
 
       - name: Definir variáveis de ambiente para deploy
         run: |
-          echo "GATEWAY_IMAGE=ghcr.io/${{ toLower(github.repository_owner) }}/gateway:${{ github.sha }}" >> $GITHUB_ENV
-          echo "SHORTENER_IMAGE=ghcr.io/${{ toLower(github.repository_owner) }}/shortener:${{ github.sha }}" >> $GITHUB_ENV
+          echo "GATEWAY_IMAGE=ghcr.io/${{ github.actor }}/gateway:${{ github.sha }}" >> $GITHUB_ENV
+          echo "SHORTENER_IMAGE=ghcr.io/${{ github.actor }}/shortener:${{ github.sha }}" >> $GITHUB_ENV
