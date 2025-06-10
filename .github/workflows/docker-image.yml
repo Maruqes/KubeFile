@@ -1,0 +1,60 @@
+name: Deploy to k3s
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Login to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ secrets.GHCR_USER }}
+        password: ${{ secrets.GHCR_TOKEN }}
+
+    # Build Gateway
+    - name: Build and Push Gateway
+      run: |
+        docker build -t ghcr.io/${{ github.repository_owner }}/url-gateway:${{ github.sha }} ./services/gateway
+        docker push ghcr.io/${{ github.repository_owner }}/url-gateway:${{ github.sha }}
+
+    # Build Shortener
+    - name: Build and Push Shortener
+      run: |
+        docker build -t ghcr.io/${{ github.repository_owner }}/url-shortener:${{ github.sha }} ./services/shortener
+        docker push ghcr.io/${{ github.repository_owner }}/url-shortener:${{ github.sha }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-push
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup k3s connection
+      uses: kodermax/kubectl-actions@v1
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Deploy Redis
+      run: kubectl apply -f k8s/redis-statefulset.yaml
+
+    - name: Deploy Shortener
+      run: |
+        kubectl set image deployment/shortener \
+          shortener=ghcr.io/${{ github.repository_owner }}/url-shortener:${{ github.sha }} \
+          --record
+      if: ${{ always() }}
+
+    - name: Deploy Gateway
+      run: |
+        kubectl set image deployment/gateway \
+          gateway=ghcr.io/${{ github.repository_owner }}/url-gateway:${{ github.sha }} \
+          --record
+      if: ${{ always() }}
