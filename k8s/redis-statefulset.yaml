@@ -5,8 +5,8 @@ metadata:
   labels:
     app: redis
 spec:
-  serviceName: "redis-master-headless" # A headless service for stable network identities
-  replicas: 1 # Start with 1, you'd add more for replicas/cluster
+  serviceName: "redis-master-headless" # Headless service
+  replicas: 1
   selector:
     matchLabels:
       app: redis
@@ -21,21 +21,21 @@ spec:
       containers:
         - name: redis
           image: redis:latest
-          command: ["redis-server", "--appendonly", "yes"] # Enable AOF for persistence
+          command: ["redis-server", "--appendonly", "yes"]
           ports:
             - containerPort: 6379
           readinessProbe:
             exec:
               command:
-              - redis-cli
-              - ping
+                - redis-cli
+                - ping
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             exec:
               command:
-              - redis-cli
-              - ping
+                - redis-cli
+                - ping
             initialDelaySeconds: 10
             periodSeconds: 30
           volumeMounts:
@@ -44,9 +44,8 @@ spec:
       volumes:
         - name: redis-data
           persistentVolumeClaim:
-            claimName: redis-pvc # This PVC needs to exist or be dynamically provisioned
+            claimName: redis-pvc
 ---
-# redis-master-headless-service.yaml (Headless service for StatefulSet)
 apiVersion: v1
 kind: Service
 metadata:
@@ -58,24 +57,22 @@ spec:
   ports:
     - port: 6379
       name: redis
-  clusterIP: None # This makes it a headless service
+  clusterIP: None
   selector:
     app: redis
     role: master
 ---
-# redis-pvc.yaml (Example PVC - adjust storageClassName as needed)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: redis-pvc
 spec:
   accessModes:
-    - ReadWriteOnce # Typically for a single Redis instance
+    - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi # Request 1GB of storage
+      storage: 1Gi
 ---
-# Regular Redis service for connections from other services
 apiVersion: v1
 kind: Service
 metadata:
@@ -84,11 +81,11 @@ metadata:
     app: redis
     role: master
 spec:
+  selector:
+    app: redis
+    role: master
   ports:
     - port: 6379
       targetPort: 6379
       name: redis
-  selector:
-    app: redis
-    role: master
   type: ClusterIP
