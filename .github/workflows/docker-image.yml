@@ -10,6 +10,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # define um env global para este job
+    env:
+      REPO_OWNER: ${{ github.repository_owner }}
+
     steps:
       - name: Fazer checkout do código
         uses: actions/checkout@v3
@@ -27,6 +31,11 @@ jobs:
           username: ${{ secrets.GHCR_USER }}
           password: ${{ secrets.GHCR_TOKEN }}
 
+      # Passo extra: força o REPO_OWNER a lowercase
+      - name: Forçar owner a lowercase
+        run: |
+          echo "OWNER=$(echo \"$REPO_OWNER\" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Construir e enviar imagem do gateway
         uses: docker/build-push-action@v4
         with:
@@ -34,8 +43,8 @@ jobs:
           file: ./services/gateway/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.actor }}/gateway:latest
-            ghcr.io/${{ github.actor }}/gateway:${{ github.sha }}
+            ghcr.io/${{ env.OWNER }}/gateway:latest
+            ghcr.io/${{ env.OWNER }}/gateway:${{ github.sha }}
 
       - name: Construir e enviar imagem do shortener
         uses: docker/build-push-action@v4
@@ -44,11 +53,13 @@ jobs:
           file: ./services/shortener/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.actor }}/shortener:latest
-            ghcr.io/${{ github.actor }}/shortener:${{ github.sha }}
-
+            ghcr.io/${{ env.OWNER }}/shortener:latest
+            ghcr.io/${{ env.OWNER }}/shortener:${{ github.sha }}
 
       - name: Definir variáveis de ambiente para deploy
         run: |
+          echo "GATEWAY_IMAGE=ghcr.io/${{ env.OWNER }}/gateway:${{ github.sha }}" >> $GITHUB_ENV
+          echo "SHORTENER_IMAGE=ghcr.io/${{ env.OWNER }}/shortener:${{ github.sha }}" >> $GITHUB_ENV
+
           echo "GATEWAY_IMAGE=ghcr.io/${{ github.actor }}/gateway:${{ github.sha }}" >> $GITHUB_ENV
           echo "SHORTENER_IMAGE=ghcr.io/${{ github.actor }}/shortener:${{ github.sha }}" >> $GITHUB_ENV
