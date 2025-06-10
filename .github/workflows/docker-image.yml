@@ -15,19 +15,24 @@ jobs:
       shortener_image: ${{ steps.set-images.outputs.shortener_image }}
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: docker/setup-qemu-action@v2
-      - uses: docker/setup-buildx-action@v2
+      - name: Fazer checkout do código
+        uses: actions/checkout@v3
 
-      - name: Login no GHCR
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login no GitHub Container Registry
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ secrets.GHCR_USER }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build & Push gateway
-        id: build-gateway
+      - id: build-gateway
+        name: Construir e enviar imagem do gateway
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -37,8 +42,8 @@ jobs:
             ghcr.io/${{ env.OWNER }}/gateway:latest
             ghcr.io/${{ env.OWNER }}/gateway:${{ github.sha }}
 
-      - name: Build & Push shortener
-        id: build-shortener
+      - id: build-shortener
+        name: Construir e enviar imagem do shortener
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -48,47 +53,42 @@ jobs:
             ghcr.io/${{ env.OWNER }}/shortener:latest
             ghcr.io/${{ env.OWNER }}/shortener:${{ github.sha }}
 
-      - name: Definir outputs das imagens
-        id: set-images
+      - id: set-images
+        name: Definir outputs das imagens
         run: |
-          echo "::set-output name=gateway_image::ghcr.io/${{ env.OWNER }}/gateway:${{ github.sha }}"
-          echo "::set-output name=shortener_image::ghcr.io/${{ env.OWNER }}/shortener:${{ github.sha }}"
-
+          echo "gateway_image=ghcr.io/${{ env.OWNER }}/gateway:${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "shortener_image=ghcr.io/${{ env.OWNER }}/shortener:${{ github.sha }}" >> $GITHUB_OUTPUT
 
   deploy:
-      needs: build
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v3
-  
-        - name: Carregar chave SSH
-          uses: webfactory/ssh-agent@v0.5.4
-          with:
-            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-            # ssh-passphrase: ${{ secrets.SSH_PASSPHRASE }}  se houver
-  
-        - name: Configurar SSH para Proxy
-          run: |
-            mkdir -p ~/.ssh
-            cat << 'EOF' > ~/.ssh/config
-            Host target-server
-              HostName sftp
-              User sftp
-              ProxyCommand openssl s_client -connect maruqes.com:10512 -servername sftp.maruqes.com -quiet
-              StrictHostKeyChecking no
-              UserKnownHostsFile /dev/null
-            EOF
-            chmod 600 ~/.ssh/config
-  
-        - name: Deploy via SSH
-          run: |
-            ssh target-server << 'EOF'
-              docker pull ${{ needs.build.outputs.gateway_image }}
-              docker pull ${{ needs.build.outputs.shortener_image }}
-              # usar k3s kubectl ou configurar kubeconfig
-              sudo k3s kubectl apply -f /home/sftp/workspace/k8s/
-            EOF
-  
-            EOF
-  
-    
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fazer checkout do código
+        uses: actions/checkout@v3
+
+      - name: Carregar chave SSH no agente
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # se usares passphrase na chave, descomenta a linha abaixo
+          # ssh-passphrase: ${{ secrets.SSH_PASSPHRASE }}
+
+      - name: Configurar SSH com ProxyCommand e ignorar host key
+        run: |
+          mkdir -p ~/.ssh
+          cat << 'EOF' > ~/.ssh/config
+          Host target-server
+            HostName sftp
+            User sftp
+            ProxyCommand openssl s_client -connect maruqes.com:10512 -servername sftp.maruqes.com -quiet
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Fazer deploy no servidor
+        run: |
+          ssh target-server "echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S docker pull ${{ needs.build.outputs.gateway_image }}"
+          ssh target-server "echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S docker pull ${{ needs.build.outputs.shortener_image }}"
+          ssh target-server "echo '${{ secrets.SUDO_PASSWORD }}' | sudo -S k3s kubectl apply -f /home/sftp/workspace/k8s/"
