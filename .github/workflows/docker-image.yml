@@ -5,14 +5,13 @@ on:
     branches:
       - main
 
-# dentro de .github/workflows/docker-image.yml
-
 jobs:
   build:
     runs-on: ubuntu-latest
-    # define um env global para este job
+
+    # força o teu namespace GHCR em lowercase
     env:
-      REPO_OWNER: ${{ github.repository_owner }}
+      OWNER: maruqes
 
     steps:
       - name: Fazer checkout do código
@@ -30,11 +29,6 @@ jobs:
           registry: ghcr.io
           username: ${{ secrets.GHCR_USER }}
           password: ${{ secrets.GHCR_TOKEN }}
-
-      # Passo extra: força o REPO_OWNER a lowercase
-      - name: Forçar owner a lowercase
-        run: |
-          echo "OWNER=$(echo \"$REPO_OWNER\" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Construir e enviar imagem do gateway
         uses: docker/build-push-action@v4
@@ -61,5 +55,18 @@ jobs:
           echo "GATEWAY_IMAGE=ghcr.io/${{ env.OWNER }}/gateway:${{ github.sha }}" >> $GITHUB_ENV
           echo "SHORTENER_IMAGE=ghcr.io/${{ env.OWNER }}/shortener:${{ github.sha }}" >> $GITHUB_ENV
 
-          echo "GATEWAY_IMAGE=ghcr.io/${{ github.actor }}/gateway:${{ github.sha }}" >> $GITHUB_ENV
-          echo "SHORTENER_IMAGE=ghcr.io/${{ github.actor }}/shortener:${{ github.sha }}" >> $GITHUB_ENV
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar deploy via SSH
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.HOME_SERVER_HOST }}
+          username: ${{ secrets.HOME_SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            docker pull $GATEWAY_IMAGE
+            docker pull $SHORTENER_IMAGE
+            kubectl --kubeconfig=/home/${{ secrets.HOME_SERVER_USER }}/.kube/config apply -f k8s/
