@@ -33,7 +33,7 @@ jobs:
       - name: Construir e enviar imagem do gateway
         uses: docker/build-push-action@v4
         with:
-          context: ./services/gateway
+          context: .
           file: ./services/gateway/Dockerfile
           push: true
           tags: |
@@ -43,7 +43,7 @@ jobs:
       - name: Construir e enviar imagem do shortener
         uses: docker/build-push-action@v4
         with:
-          context: ./services/shortener
+          context: .
           file: ./services/shortener/Dockerfile
           push: true
           tags: |
