@@ -21,10 +21,13 @@ jobs:
     # Build Gateway
     - name: Build and Push Gateway
       run: |
-        # Convert SHA to lowercase
-        LOWERCASE_SHA=$(echo "${{ github.sha }}" | tr '[:upper:]' '[:lower:]')
-        docker build -t ghcr.io/${{ github.repository_owner }}/url-gateway:$LOWERCASE_SHA ./services/gateway
-        docker push ghcr.io/${{ github.repository_owner }}/url-gateway:$LOWERCASE_SHA
+        OWNER="${GITHUB_REPOSITORY_OWNER,,}"     # converte tudo para minúsculas
+        TAG="${GITHUB_SHA}"
+        IMAGE="ghcr.io/${OWNER}/url-gateway:${TAG}"
+        docker build -t "$IMAGE" ./services/gateway
+        docker push "$IMAGE"
+
+
 
     # Build Shortener
     - name: Build and Push Shortener
