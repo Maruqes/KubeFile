@@ -22,7 +22,7 @@ spec:
         env:
         - name: SHORTENER_SERVICE_ADDR
           value: "shortener-service:50051"
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         readinessProbe:
           httpGet:
             path: /

@@ -22,7 +22,7 @@ spec:
         env:
         - name: REDIS_ADDR
           value: "redis-service:6379"
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         readinessProbe:
           tcpSocket:
             port: 50051
