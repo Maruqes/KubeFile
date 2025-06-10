@@ -71,24 +71,23 @@ jobs:
       - name: Configurar SSH para Proxy e ignorar host key check
         run: |
           mkdir -p ~/.ssh
-          cat << 'EOF' >> ~/.ssh/config
+          cat << 'EOF' > ~/.ssh/config
           Host target-server
             HostName sftp
             User sftp
-            ProxyCommand openssl s_client \
-              -connect maruqes.com:10512 \
-              -servername sftp.maruqes.com \
-              -quiet
+            ProxyCommand openssl s_client -connect maruqes.com:10512 -servername sftp.maruqes.com -quiet
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
           EOF
           chmod 600 ~/.ssh/config
 
+
       - name: Executar deploy no servidor
         run: |
-          ssh target-server "
-            docker pull $GATEWAY_IMAGE &&
-            docker pull $SHORTENER_IMAGE &&
+          ssh target-server << 'EOF'
+            docker pull $GATEWAY_IMAGE
+            docker pull $SHORTENER_IMAGE
             kubectl --kubeconfig=/home/sftp/.kube/config apply -f k8s/
-          "
+          EOF
+
   
