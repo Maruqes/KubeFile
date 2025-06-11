@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package filesharing;
+
+option go_package = "shared/proto/filesharing;filesharing";
+
+service FileUpload {
+  rpc UploadFile (UploadFileRequest) returns (UploadFileResponse) {}
+  rpc GetFile (GetFileRequest) returns (GetFileResponse) {}
+}
+
+message UploadFileRequest {
+  string FileName = 1;
+  bytes FileContent = 2;
+  string CurrentUrl = 3;
+}
+
+message UploadFileResponse {
+  string FileURL = 1;
+  string FileName = 2;
+}
+
+message GetFileRequest {
+  string FileName = 1;
+}
+message GetFileResponse {
+  bytes FileContent = 1;
+  string FileName = 2;
+}

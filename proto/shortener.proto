@@ -9,7 +9,6 @@ service Shortener {
   rpc ResolveURL (ResolveURLRequest) returns (ResolveURLResponse) {}
 }
 
-
 message ShortURLRequest {
   string BaseURL = 1;
   string OriginalURL = 2;

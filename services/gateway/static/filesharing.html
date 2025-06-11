@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KubeFile - File Sharing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#1e40af'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">KubeFile</h1>
+            <p class="text-gray-600 text-lg">Secure File Sharing Platform</p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
+                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
+                    </path>
+                </svg>
+                Upload File
+            </h2>
+
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors duration-200"
+                id="dropZone" ondrop="dropHandler(event)" ondragover="dragOverHandler(event)"
+                ondragenter="dragEnterHandler(event)" ondragleave="dragLeaveHandler(event)">
+
+                <div id="dropZoneContent">
+                    <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
+                        </path>
+                    </svg>
+                    <p class="text-gray-600 mb-2">Drag and drop your file here, or</p>
+                    <button type="button"
+                        class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-secondary transition-colors duration-200"
+                        onclick="document.getElementById('fileInput').click()">
+                        Choose File
+                    </button>
+                    <input type="file" id="fileInput" class="hidden" onchange="handleFileSelect(event)">
+                </div>
+            </div>
+
+            <!-- Selected File Info -->
+            <div id="fileInfo" class="hidden mt-4 p-4 bg-gray-100 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <svg class="w-8 h-8 text-gray-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                            </path>
+                        </svg>
+                        <div>
+                            <p class="font-medium text-gray-800" id="fileName"></p>
+                            <p class="text-sm text-gray-600" id="fileSize"></p>
+                        </div>
+                    </div>
+                    <button type="button" class="text-gray-400 hover:text-gray-600" onclick="clearFileSelection()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Upload Button -->
+            <div class="mt-6">
+                <button id="uploadBtn"
+                    class="w-full bg-primary text-white py-3 px-6 rounded-lg font-semibold hover:bg-secondary transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onclick="uploadFile()" disabled>
+                    <span id="uploadBtnText">Select a file to upload</span>
+                    <svg id="uploadSpinner" class="hidden animate-spin w-5 h-5 inline ml-2" fill="none"
+                        viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Upload Result -->
+        <div id="uploadResult" class="hidden bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Upload Successful!</h3>
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p class="text-green-800 mb-2">Your file has been uploaded successfully.</p>
+                <div class="flex items-center space-x-4">
+                    <button
+                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200"
+                        onclick="copyToClipboard()">
+                        Copy File URL
+                    </button>
+                    <a id="downloadLink" href="#"
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200 no-underline"
+                        target="_blank">
+                        Download File
+                    </a>
+                </div>
+                <p class="text-sm text-gray-600 mt-2" id="uploadedFileInfo"></p>
+            </div>
+        </div>
+
+        <!-- Download Section -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
+                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                    </path>
+                </svg>
+                Download File
+            </h2>
+
+            <div class="flex space-x-4">
+                <input type="text" id="downloadFileName" placeholder="Enter filename to download"
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                <button onclick="downloadFile()"
+                    class="bg-primary text-white px-6 py-3 rounded-lg hover:bg-secondary transition-colors duration-200 font-semibold">
+                    Download
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8 text-gray-500">
+            <p>&copy; 2025 KubeFile. Secure file sharing made simple.</p>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast"
+        class="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg transform translate-x-full transition-transform duration-300 ease-in-out">
+        <span id="toastMessage"></span>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let uploadedFileUrl = null;
+
+        // Drag and drop handlers
+        function dragOverHandler(ev) {
+            ev.preventDefault();
+        }
+
+        function dragEnterHandler(ev) {
+            ev.preventDefault();
+            document.getElementById('dropZone').classList.add('border-primary', 'bg-blue-50');
+        }
+
+        function dragLeaveHandler(ev) {
+            ev.preventDefault();
+            document.getElementById('dropZone').classList.remove('border-primary', 'bg-blue-50');
+        }
+
+        function dropHandler(ev) {
+            ev.preventDefault();
+            document.getElementById('dropZone').classList.remove('border-primary', 'bg-blue-50');
+
+            const files = ev.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        // File selection handler
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        // Handle selected file
+        function handleFile(file) {
+            selectedFile = file;
+
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileInfo').classList.remove('hidden');
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = false;
+            document.getElementById('uploadBtnText').textContent = 'Upload File';
+        }
+
+        // Clear file selection
+        function clearFileSelection() {
+            selectedFile = null;
+            document.getElementById('fileInfo').classList.add('hidden');
+            document.getElementById('fileInput').value = '';
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            document.getElementById('uploadBtnText').textContent = 'Select a file to upload';
+        }
+
+        // Upload file
+        async function uploadFile() {
+            if (!selectedFile) return;
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            const uploadBtnText = document.getElementById('uploadBtnText');
+            const uploadSpinner = document.getElementById('uploadSpinner');
+
+            uploadBtn.disabled = true;
+            uploadBtnText.textContent = 'Uploading...';
+            uploadSpinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`/upload?filename=${encodeURIComponent(selectedFile.name)}`, {
+                    method: 'POST',
+                    body: selectedFile,
+                    headers: {
+                        'Content-Type': 'application/octet-stream'
+                    }
+                });
+
+                if (response.ok) {
+                    const responseText = await response.text();
+                    const lines = responseText.split('\n');
+                    const fileUrl = lines.find(line => line.startsWith('File URL:'))?.replace('File URL: ', '');
+
+                    uploadedFileUrl = fileUrl;
+
+                    document.getElementById('uploadedFileInfo').textContent = `File: ${selectedFile.name} (${formatFileSize(selectedFile.size)})`;
+                    document.getElementById('downloadLink').href = `/get?fileName=${encodeURIComponent(selectedFile.name)}`;
+                    document.getElementById('uploadResult').classList.remove('hidden');
+
+                    showToast('File uploaded successfully!', 'success');
+                    clearFileSelection();
+                } else {
+                    const errorText = await response.text();
+                    showToast(`Upload failed: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                showToast(`Upload failed: ${error.message}`, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtnText.textContent = 'Select a file to upload';
+                uploadSpinner.classList.add('hidden');
+            }
+        }
+
+        // Download file
+        function downloadFile() {
+            const fileName = document.getElementById('downloadFileName').value.trim();
+            if (!fileName) {
+                showToast('Please enter a filename', 'error');
+                return;
+            }
+
+            const downloadUrl = `/get?fileName=${encodeURIComponent(fileName)}`;
+            window.open(downloadUrl, '_blank');
+        }
+
+        // Copy to clipboard
+        function copyToClipboard() {
+            if (uploadedFileUrl) {
+                navigator.clipboard.writeText(uploadedFileUrl).then(() => {
+                    showToast('File URL copied to clipboard!', 'success');
+                });
+            }
+        }
+
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+
+            toastMessage.textContent = message;
+
+            if (type === 'error') {
+                toast.classList.remove('bg-green-600');
+                toast.classList.add('bg-red-600');
+            } else {
+                toast.classList.remove('bg-red-600');
+                toast.classList.add('bg-green-600');
+            }
+
+            toast.classList.remove('translate-x-full');
+
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+            }, 3000);
+        }
+    </script>
+</body>
+
+</html>

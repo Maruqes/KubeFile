@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filesharing-service
+  labels:
+    app: filesharing-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: filesharing-service
+  template:
+    metadata:
+      labels:
+        app: filesharing-service
+    spec:
+      containers:
+      - name: filesharing-service
+        image: filesharing-service:latest
+        ports:
+        - containerPort: 50052
+        env:
+        - name: REDIS_ADDR
+          value: "redis-service:6379"
+        - name: MINIO_ENDPOINT
+          value: "minio-service.minio:9000"
+        - name: MINIO_ACCESS_KEY
+          value: "MINIO_ACCESS_KEY"
+        - name: MINIO_SECRET_KEY
+          value: "MINIO_SECRET_KEY"
+        imagePullPolicy: Never
+        readinessProbe:
+          tcpSocket:
+            port: 50052
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          tcpSocket:
+            port: 50052
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: filesharing-service
+spec:
+  selector:
+    app: filesharing-service
+  ports:
+  - port: 50052
+    targetPort: 50052
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: filesharing-service-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: filesharing-service
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
