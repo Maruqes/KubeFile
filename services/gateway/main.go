@@ -116,6 +116,7 @@ func handleUploadFile(w http.ResponseWriter, r *http.Request, client filesharing
 		CurrentUrl:  baseURL + "/get?fileName=" + filename,
 	})
 	if err != nil {
+		fmt.Printf("Error uploading file: %v\n", err)
 		http.Error(w, "Erro ao fazer upload do ficheiro", http.StatusInternalServerError)
 		return
 	}
@@ -153,7 +154,7 @@ func handleGetFile(w http.ResponseWriter, r *http.Request, client filesharing.Fi
 	w.Write(res.FileContent)
 }
 
-func serveFilesharingPage(w http.ResponseWriter, r *http.Request) {
+func serveUnifiedPage(w http.ResponseWriter, r *http.Request) {
 	// Get the absolute path to the static file
 	staticDir := filepath.Join(".", "static")
 	filePath := filepath.Join(staticDir, "filesharing.html")
@@ -182,8 +183,7 @@ func main() {
 
 	// Configure HTTP routes
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Gateway service is running"))
+		http.Redirect(w, r, "/app", http.StatusFound)
 	})
 
 	http.HandleFunc("/short", func(w http.ResponseWriter, r *http.Request) {
@@ -211,7 +211,12 @@ func main() {
 	})
 
 	http.HandleFunc("/filesharing", func(w http.ResponseWriter, r *http.Request) {
-		serveFilesharingPage(w, r)
+		serveUnifiedPage(w, r)
+	})
+
+	// Add route for the main page (root can redirect to the unified page)
+	http.HandleFunc("/app", func(w http.ResponseWriter, r *http.Request) {
+		serveUnifiedPage(w, r)
 	})
 
 	log.Println("Gateway HTTP server starting on port 8080...")
