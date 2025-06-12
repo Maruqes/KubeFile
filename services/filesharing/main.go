@@ -40,6 +40,18 @@ func (f *FilesharingService) UploadFile(ctx context.Context, req *filesharing.Up
 	return res, nil
 }
 
+func (f *FilesharingService) AddChunk(ctx context.Context, req *filesharing.AddChunkRequest) (*filesharing.AddChunkResponse, error) {
+	err := addChunkToFile(ctx, minioClient, "ficheiros", req.FileName, req.ChunkData)
+	if err != nil {
+		return nil, fmt.Errorf("error adding chunk to file: %v", err)
+	}
+
+	return &filesharing.AddChunkResponse{
+		Success: true,
+		Message: "Chunk added successfully",
+	}, nil
+}
+
 func (f *FilesharingService) GetFile(ctx context.Context, req *filesharing.GetFileRequest) (*filesharing.GetFileResponse, error) {
 	fileData, err := returnFileFromS3(minioClient, "ficheiros", req.FileName)
 	if err != nil {
@@ -52,6 +64,126 @@ func (f *FilesharingService) GetFile(ctx context.Context, req *filesharing.GetFi
 	}
 
 	return res, nil
+}
+
+func (f *FilesharingService) GetChunk(ctx context.Context, req *filesharing.GetChunkRequest) (*filesharing.GetChunkResponse, error) {
+	//5.5MB chunk size
+	chunkSize := int64(5.5 * 1024 * 1024) // 5.5MB
+	start := int64(req.ChunkIndex) * chunkSize
+	end := start + chunkSize - 1
+
+	// Get the object info to check file size
+	objInfo, err := minioClient.StatObject(ctx, "ficheiros", req.FileName, minio.StatObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error getting file info: %v", err)
+	}
+
+	if start >= objInfo.Size {
+		return nil, fmt.Errorf("chunk index out of range")
+	}
+	if end >= objInfo.Size {
+		end = objInfo.Size - 1
+	}
+
+	// Get only the specific chunk range
+	opts := minio.GetObjectOptions{}
+	err = opts.SetRange(start, end)
+	if err != nil {
+		return nil, fmt.Errorf("error setting range: %v", err)
+	}
+
+	object, err := minioClient.GetObject(ctx, "ficheiros", req.FileName, opts)
+	if err != nil {
+		return nil, fmt.Errorf("error getting chunk from MinIO: %v", err)
+	}
+	defer object.Close()
+
+	// Read the chunk data
+	chunkData := make([]byte, end-start+1)
+	_, err = object.Read(chunkData)
+	if err != nil && err.Error() != "EOF" {
+		return nil, fmt.Errorf("error reading chunk: %v", err)
+	}
+
+	return &filesharing.GetChunkResponse{
+		ChunkData: chunkData,
+	}, nil
+}
+
+func addChunkToFile(ctx context.Context, minioClient *minio.Client, bucketName, objectName string, chunkData []byte) error {
+	log.Printf("📦 Starting addChunkToFile for object: %s, chunk size: %d bytes", objectName, len(chunkData))
+
+	// Check if the object exists
+	_, err := minioClient.StatObject(ctx, bucketName, objectName, minio.StatObjectOptions{})
+	if err != nil {
+		// If object doesn't exist, create it with the first chunk
+		log.Printf("🆕 Object doesn't exist, creating new file with first chunk")
+		reader := bytes.NewReader(chunkData)
+		info, err := minioClient.PutObject(ctx, bucketName, objectName, reader, int64(len(chunkData)), minio.PutObjectOptions{})
+		if err != nil {
+			log.Printf("❌ Failed to create new file: %v", err)
+			return fmt.Errorf("error creating new file in MinIO: %v", err)
+		}
+		log.Printf("✅ New file created successfully: %s (size: %d bytes)", info.Key, info.Size)
+		return nil
+	}
+
+	log.Printf("📄 Object exists, appending chunk to existing file: %s", objectName)
+
+	// Use ComposeObject to append chunk to existing object
+	srcInfo := minio.CopySrcOptions{
+		Bucket: bucketName,
+		Object: objectName,
+	}
+
+	// Upload the new chunk as a temporary object
+	tempObjectName := objectName + "_temp_chunk"
+	log.Printf("⏳ Uploading temporary chunk: %s", tempObjectName)
+	reader := bytes.NewReader(chunkData)
+	_, err = minioClient.PutObject(ctx, bucketName, tempObjectName, reader, int64(len(chunkData)), minio.PutObjectOptions{})
+	if err != nil {
+		log.Printf("❌ Failed to upload temporary chunk: %v", err)
+		return fmt.Errorf("error uploading temporary chunk: %v", err)
+	}
+	log.Printf("✅ Temporary chunk uploaded successfully: %s", tempObjectName)
+
+	// Compose the original object with the new chunk
+	tempSrcInfo := minio.CopySrcOptions{
+		Bucket: bucketName,
+		Object: tempObjectName,
+	}
+
+	dst := minio.CopyDestOptions{
+		Bucket: bucketName,
+		Object: objectName,
+	}
+
+	log.Printf("🔄 Composing objects: %s + %s -> %s", objectName, tempObjectName, objectName)
+	_, err = minioClient.ComposeObject(ctx, dst, srcInfo, tempSrcInfo)
+	if err != nil {
+		log.Printf("❌ Failed to compose objects: %v", err)
+		// Clean up temp object on failure
+		removeErr := minioClient.RemoveObject(ctx, bucketName, tempObjectName, minio.RemoveObjectOptions{})
+		if removeErr != nil {
+			log.Printf("❌ Failed to clean up temporary object after compose failure: %v", removeErr)
+		} else {
+			log.Printf("🧹 Cleaned up temporary object after compose failure: %s", tempObjectName)
+		}
+		return fmt.Errorf("error composing objects: %v", err)
+	}
+	log.Printf("✅ Objects composed successfully")
+
+	// Clean up temporary object
+	log.Printf("🧹 Cleaning up temporary object: %s", tempObjectName)
+	err = minioClient.RemoveObject(ctx, bucketName, tempObjectName, minio.RemoveObjectOptions{})
+	if err != nil {
+		log.Printf("⚠️ Warning: failed to remove temporary object: %v", err)
+	} else {
+		log.Printf("✅ Temporary object removed successfully: %s", tempObjectName)
+	}
+
+	log.Printf("✅ Chunk appended successfully to: %s", objectName)
+	return nil
 }
 
 func uploadFileToS3(minioClient *minio.Client, bucketName, objectName string, fileData []byte) error {
@@ -187,7 +319,12 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
+	// Set maximum message size to 6MB for both send and receive
+	maxMsgSize := 6 * 1024 * 1024 // 6MB
 	var opts []grpc.ServerOption
+	opts = append(opts, grpc.MaxRecvMsgSize(maxMsgSize))
+	opts = append(opts, grpc.MaxSendMsgSize(maxMsgSize))
+
 	grpcServer := grpc.NewServer(opts...)
 	filesharing.RegisterFileUploadServer(grpcServer, &FilesharingService{})
 

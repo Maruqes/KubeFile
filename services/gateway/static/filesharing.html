@@ -245,7 +245,7 @@
                     <p class="text-green-400 mb-4 text-sm">File uploaded successfully and ready for sharing</p>
                     <div class="flex flex-wrap gap-3 mb-3">
                         <button
-                            class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 font-medium flex items-center space-x-2 text-sm"
+                            class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 font-medium flex items-center space-x-2"
                             onclick="copyToClipboard()">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -494,8 +494,31 @@
 
     <script>
         let selectedFile = null;
+        let selectedChunkFile = null;
         let uploadedFileUrl = null;
         let shortenedUrlData = null;
+
+        // Chunk size: 5.5MB
+        const CHUNK_SIZE = 5.5 * 1024 * 1024; // 5.5 MB in bytes
+
+        // Check URL parameters for automatic download
+        function checkForAutoDownload() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const filename = urlParams.get('filename');
+
+            if (filename) {
+                showToast(`Auto-downloading ${filename}...`, 'success');
+                // Small delay to let the page load completely
+                setTimeout(() => {
+                    autoDownloadFile(filename);
+                }, 1000);
+            }
+        }
+
+        // Initialize page when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function () {
+            checkForAutoDownload();
+        });
 
         // Tab switching functionality
         function switchTab(tabName) {
@@ -690,7 +713,27 @@
             document.getElementById('uploadBtnText').textContent = 'Select a file to upload';
         }
 
-        // Upload file
+        // Retry helper function
+        async function retryOperation(operation, maxRetries = 3, delay = 1000) {
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    return await operation();
+                } catch (error) {
+                    console.log(`Attempt ${attempt} failed:`, error.message);
+
+                    if (attempt === maxRetries) {
+                        throw new Error(`Operation failed after ${maxRetries} attempts: ${error.message}`);
+                    }
+
+                    // Wait before retrying (exponential backoff)
+                    const waitTime = delay * Math.pow(2, attempt - 1);
+                    console.log(`Waiting ${waitTime}ms before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+            }
+        }
+
+        // Upload file with chunking
         async function uploadFile() {
             if (!selectedFile) return;
 
@@ -699,36 +742,92 @@
             const uploadSpinner = document.getElementById('uploadSpinner');
 
             uploadBtn.disabled = true;
-            uploadBtnText.textContent = 'Uploading...';
             uploadSpinner.classList.remove('hidden');
 
             try {
-                const response = await fetch(`/upload?filename=${encodeURIComponent(selectedFile.name)}`, {
-                    method: 'POST',
-                    body: selectedFile,
-                    headers: {
-                        'Content-Type': 'application/octet-stream'
+                const fileSize = selectedFile.size;
+                const fileName = selectedFile.name;
+                const totalChunks = Math.ceil(fileSize / CHUNK_SIZE);
+
+                console.log(`File size: ${formatFileSize(fileSize)}, Total chunks: ${totalChunks}, Chunk size: ${formatFileSize(CHUNK_SIZE)}`);
+
+                // Upload first chunk with /upload endpoint
+                let start = 0;
+                let end = Math.min(CHUNK_SIZE, fileSize);
+                let chunkNumber = 1;
+
+                uploadBtnText.textContent = `Uploading chunk ${chunkNumber}/${totalChunks}...`;
+
+                const firstChunk = selectedFile.slice(start, end);
+                console.log(`Uploading first chunk: ${formatFileSize(firstChunk.size)}`);
+
+                const firstResponse = await retryOperation(async () => {
+                    const response = await fetch(`/upload?filename=${encodeURIComponent(fileName)}`, {
+                        method: 'POST',
+                        body: firstChunk,
+                        headers: {
+                            'Content-Type': 'application/octet-stream'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`First chunk upload failed: ${errorText}`);
                     }
+
+                    return response;
                 });
 
-                if (response.ok) {
-                    const responseText = await response.text();
-                    const lines = responseText.split('\n');
-                    const fileUrl = lines.find(line => line.startsWith('File URL:'))?.replace('File URL: ', '');
+                const firstResponseText = await firstResponse.text();
+                console.log('First chunk response:', firstResponseText);
 
-                    uploadedFileUrl = fileUrl;
+                // Upload remaining chunks with /upload-chunk endpoint
+                for (let i = 1; i < totalChunks; i++) {
+                    chunkNumber = i + 1;
+                    start = i * CHUNK_SIZE;
+                    end = Math.min(start + CHUNK_SIZE, fileSize);
 
-                    document.getElementById('uploadedFileInfo').textContent = `File: ${selectedFile.name} (${formatFileSize(selectedFile.size)})`;
-                    document.getElementById('downloadLink').href = `/get?fileName=${encodeURIComponent(selectedFile.name)}`;
-                    document.getElementById('uploadResult').classList.remove('hidden');
+                    uploadBtnText.textContent = `Uploading chunk ${chunkNumber}/${totalChunks}...`;
 
-                    showToast('File uploaded successfully!', 'success');
-                    clearFileSelection();
-                } else {
-                    const errorText = await response.text();
-                    showToast(`Upload failed: ${errorText}`, 'error');
+                    const chunk = selectedFile.slice(start, end);
+                    console.log(`Uploading chunk ${chunkNumber}: ${formatFileSize(chunk.size)}`);
+
+                    const chunkResponse = await retryOperation(async () => {
+                        const response = await fetch(`/upload-chunk?filename=${encodeURIComponent(fileName)}`, {
+                            method: 'POST',
+                            body: chunk,
+                            headers: {
+                                'Content-Type': 'application/octet-stream'
+                            }
+                        });
+
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(`Chunk ${chunkNumber} upload failed: ${errorText}`);
+                        }
+
+                        return response;
+                    });
+
+                    const chunkResponseText = await chunkResponse.text();
+                    console.log(`Chunk ${chunkNumber} response:`, chunkResponseText);
                 }
+
+                // Get file URL from first response
+                const lines = firstResponseText.split('\n');
+                const fileUrl = lines.find(line => line.startsWith('File URL:'))?.replace('File URL: ', '');
+                uploadedFileUrl = fileUrl;
+
+                document.getElementById('uploadedFileInfo').textContent = `File: ${fileName} (${formatFileSize(fileSize)}) - Uploaded in ${totalChunks} chunks`;
+                document.getElementById('downloadLink').href = '#';
+                document.getElementById('downloadLink').onclick = () => autoDownloadFile(fileName);
+                document.getElementById('uploadResult').classList.remove('hidden');
+
+                showToast(`File uploaded successfully in ${totalChunks} chunks!`, 'success');
+                clearFileSelection();
+
             } catch (error) {
+                console.error('Upload error:', error);
                 showToast(`Upload failed: ${error.message}`, 'error');
             } finally {
                 uploadBtn.disabled = false;
@@ -737,16 +836,212 @@
             }
         }
 
-        // Download file
-        function downloadFile() {
+        // Chunk Upload Functions
+        function chunkDragEnterHandler(ev) {
+            ev.preventDefault();
+            const dropZone = document.getElementById('chunkDropZone');
+            dropZone.classList.add('border-purple-500', 'bg-purple-500/10');
+            dropZone.classList.remove('border-slate-600');
+        }
+
+        function chunkDragLeaveHandler(ev) {
+            ev.preventDefault();
+            const dropZone = document.getElementById('chunkDropZone');
+            dropZone.classList.remove('border-purple-500', 'bg-purple-500/10');
+            dropZone.classList.add('border-slate-600');
+        }
+
+        function chunkDropHandler(ev) {
+            ev.preventDefault();
+            const dropZone = document.getElementById('chunkDropZone');
+            dropZone.classList.remove('border-purple-500', 'bg-purple-500/10');
+            dropZone.classList.add('border-slate-600');
+
+            const files = ev.dataTransfer.files;
+            if (files.length > 0) {
+                handleChunkFile(files[0]);
+            }
+        }
+
+        // Chunk file selection handler
+        function handleChunkFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                handleChunkFile(files[0]);
+            }
+        }
+
+        // Handle selected chunk file
+        function handleChunkFile(file) {
+            selectedChunkFile = file;
+
+            document.getElementById('chunkFileName').textContent = file.name;
+            document.getElementById('chunkFileSize').textContent = formatFileSize(file.size);
+            document.getElementById('chunkFileInfo').classList.remove('hidden');
+
+            const uploadBtn = document.getElementById('chunkUploadBtn');
+            uploadBtn.disabled = false;
+            document.getElementById('chunkUploadBtnText').textContent = 'Upload File as Chunk';
+        }
+
+        // Clear chunk file selection
+        function clearChunkFileSelection() {
+            selectedChunkFile = null;
+            document.getElementById('chunkFileInfo').classList.add('hidden');
+            document.getElementById('chunkFileInput').value = '';
+
+            const uploadBtn = document.getElementById('chunkUploadBtn');
+            uploadBtn.disabled = true;
+            document.getElementById('chunkUploadBtnText').textContent = 'Select a file to upload as chunk';
+        }
+
+        // Upload file chunk
+        async function uploadFileChunk() {
+            if (!selectedChunkFile) return;
+
+            const uploadBtn = document.getElementById('chunkUploadBtn');
+            const uploadBtnText = document.getElementById('chunkUploadBtnText');
+            const uploadSpinner = document.getElementById('chunkUploadSpinner');
+
+            uploadBtn.disabled = true;
+            uploadBtnText.textContent = 'Uploading Chunk...';
+            uploadSpinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`/upload-chunk?filename=${encodeURIComponent(selectedChunkFile.name)}`, {
+                    method: 'POST',
+                    body: selectedChunkFile,
+                    headers: {
+                        'Content-Type': 'application/octet-stream'
+                    }
+                });
+
+                if (response.ok) {
+                    const responseText = await response.text();
+
+                    document.getElementById('chunkUploadMessage').textContent = responseText;
+                    document.getElementById('chunkUploadedFileInfo').textContent = `Chunk File: ${selectedChunkFile.name} (${formatFileSize(selectedChunkFile.size)})`;
+                    document.getElementById('chunkUploadResult').classList.remove('hidden');
+
+                    showToast('File chunk uploaded successfully!', 'success');
+                    clearChunkFileSelection();
+                } else {
+                    const errorText = await response.text();
+                    showToast(`Chunk upload failed: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                showToast(`Chunk upload failed: ${error.message}`, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtnText.textContent = 'Select a file to upload as chunk';
+                uploadSpinner.classList.add('hidden');
+            }
+        }
+
+        // Download file using chunks
+        async function downloadFile() {
             const fileName = document.getElementById('downloadFileName').value.trim();
             if (!fileName) {
                 showToast('Please enter a filename', 'error');
                 return;
             }
 
-            const downloadUrl = `/get?fileName=${encodeURIComponent(fileName)}`;
-            window.open(downloadUrl, '_blank');
+            showToast('Starting chunked download...', 'success');
+
+            try {
+                await downloadFileInChunks(fileName);
+            } catch (error) {
+                console.error('Download error:', error);
+                showToast(`Download failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-download file (used by upload result download link)
+        async function autoDownloadFile(fileName) {
+            // Auto-populate the download filename input
+            document.getElementById('downloadFileName').value = fileName;
+
+            // Show a toast to indicate the download is starting
+            showToast(`Starting download of ${fileName}...`, 'success');
+
+            try {
+                await downloadFileInChunks(fileName);
+            } catch (error) {
+                console.error('Auto-download error:', error);
+                showToast(`Download failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Download file in chunks and reassemble
+        async function downloadFileInChunks(fileName) {
+            const chunks = [];
+            let chunkIndex = 0;
+            let isLastChunk = false;
+
+            while (!isLastChunk) {
+                try {
+                    console.log(`Downloading chunk ${chunkIndex + 1}...`);
+
+                    const response = await retryOperation(async () => {
+                        const response = await fetch(`/get-chunk?fileName=${encodeURIComponent(fileName)}&chunkIndex=${chunkIndex}`);
+
+                        if (!response.ok) {
+                            throw new Error(`Failed to download chunk ${chunkIndex + 1}: ${response.statusText}`);
+                        }
+
+                        return response;
+                    });
+
+                    const chunkData = await response.arrayBuffer();
+                    chunks.push(new Uint8Array(chunkData));
+
+                    // For now, we'll assume it's the last chunk if the response is smaller than CHUNK_SIZE
+                    // In a real implementation, you'd parse response headers or response body to get IsLastChunk
+                    isLastChunk = chunkData.byteLength < CHUNK_SIZE;
+                    chunkIndex++;
+
+                    showToast(`Downloaded chunk ${chunkIndex}...`, 'success');
+                } catch (error) {
+                    if (error.message.includes('chunk index out of range') ||
+                        error.message.includes('404') ||
+                        error.message.includes('Erro ao obter chunk')) {
+                        // Assume we've reached the end of chunks
+                        isLastChunk = true;
+                        break;
+                    }
+                    throw error;
+                }
+            }
+
+            if (chunks.length === 0) {
+                throw new Error('No chunks downloaded');
+            }
+
+            // Calculate total size
+            const totalSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+
+            // Combine all chunks
+            const combinedData = new Uint8Array(totalSize);
+            let offset = 0;
+
+            for (const chunk of chunks) {
+                combinedData.set(chunk, offset);
+                offset += chunk.length;
+            }
+
+            // Create blob and download
+            const blob = new Blob([combinedData]);
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast(`File downloaded successfully! (${chunks.length} chunks, ${formatFileSize(totalSize)})`, 'success');
         }
 
         // Copy to clipboard

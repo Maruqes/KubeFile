@@ -5,7 +5,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/Maruqes/KubeFile/shared/proto/filesharing"
 	"github.com/Maruqes/KubeFile/shared/proto/shortener"
@@ -113,7 +115,7 @@ func handleUploadFile(w http.ResponseWriter, r *http.Request, client filesharing
 	res, err := client.UploadFile(r.Context(), &filesharing.UploadFileRequest{
 		FileName:    filename,
 		FileContent: []byte(contentFile),
-		CurrentUrl:  baseURL + "/get?fileName=" + filename,
+		CurrentUrl:  baseURL + "/download/" + filename,
 	})
 	if err != nil {
 		fmt.Printf("Error uploading file: %v\n", err)
@@ -124,7 +126,45 @@ func handleUploadFile(w http.ResponseWriter, r *http.Request, client filesharing
 	fmt.Fprintf(w, "File uploaded successfully: %s\nFile URL: %s", res.FileName, res.FileURL)
 }
 
-func handleGetFile(w http.ResponseWriter, r *http.Request, client filesharing.FileUploadClient) {
+func handleUploadChuck(w http.ResponseWriter, r *http.Request, client filesharing.FileUploadClient) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	filename := r.URL.Query().Get("filename")
+	if filename == "" {
+		http.Error(w, "Filename not provided", http.StatusBadRequest)
+		return
+	}
+
+	// Read file content from request body
+	contentFile, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading file content", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	res, err := client.AddChunk(r.Context(), &filesharing.AddChunkRequest{
+		FileName:  filename,
+		ChunkData: []byte(contentFile),
+	})
+	if err != nil {
+		fmt.Printf("Error uploading file: %v\n", err)
+		http.Error(w, "Erro ao fazer upload do ficheiro", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Chunk uploaded successfully: %s\nMessage: %s", filename, res.Message)
+}
+
+func handleGetFileChunk(w http.ResponseWriter, r *http.Request, client filesharing.FileUploadClient) {
 	// Add CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
@@ -140,18 +180,31 @@ func handleGetFile(w http.ResponseWriter, r *http.Request, client filesharing.Fi
 		http.Error(w, "File name not provided", http.StatusBadRequest)
 		return
 	}
-
-	res, err := client.GetFile(r.Context(), &filesharing.GetFileRequest{
-		FileName: fileName,
-	})
-	if err != nil {
-		http.Error(w, "Erro ao obter ficheiro", http.StatusInternalServerError)
+	chunkIndex := r.URL.Query().Get("chunkIndex")
+	if chunkIndex == "" {
+		http.Error(w, "Chunk index not provided", http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", res.FileName))
+	chunkIndexInt, err := strconv.ParseInt(chunkIndex, 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid chunk index", http.StatusBadRequest)
+		return
+	}
+
+	res, err := client.GetChunk(r.Context(), &filesharing.GetChunkRequest{
+		FileName:   fileName,
+		ChunkIndex: int32(chunkIndexInt),
+	})
+
+	if err != nil {
+		http.Error(w, "Erro ao obter chunk do ficheiro", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Write(res.FileContent)
+	w.Write(res.ChunkData)
 }
 
 func serveUnifiedPage(w http.ResponseWriter, r *http.Request) {
@@ -159,13 +212,27 @@ func serveUnifiedPage(w http.ResponseWriter, r *http.Request) {
 	staticDir := filepath.Join(".", "static")
 	filePath := filepath.Join(staticDir, "filesharing.html")
 
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		log.Printf("File not found: %s", filePath)
+		http.Error(w, "Page not found", http.StatusNotFound)
+		return
+	}
+
+	// Set content type for HTML
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	http.ServeFile(w, r, filePath)
 }
 
 func main() {
+	// Set maximum message size to 6MB for gRPC clients
+	maxMsgSize := 6 * 1024 * 1024 // 6MB
+
 	// Setup shortener connection
 	shortenerAddr := "shortener-service:50051"
-	shortenerConn, err := grpc.NewClient(shortenerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	shortenerConn, err := grpc.NewClient(shortenerAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize), grpc.MaxCallSendMsgSize(maxMsgSize)))
 	if err != nil {
 		log.Fatalf("Failed to connect to shortener service: %v", err)
 	}
@@ -174,7 +241,9 @@ func main() {
 
 	// Setup filesharing connection
 	filesharingAddr := "filesharing-service:50052"
-	filesharingConn, err := grpc.NewClient(filesharingAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	filesharingConn, err := grpc.NewClient(filesharingAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize), grpc.MaxCallSendMsgSize(maxMsgSize)))
 	if err != nil {
 		log.Fatalf("Failed to connect to filesharing service: %v", err)
 	}
@@ -206,17 +275,42 @@ func main() {
 		handleUploadFile(w, r, filesharingClient)
 	})
 
-	http.HandleFunc("/get", func(w http.ResponseWriter, r *http.Request) {
-		handleGetFile(w, r, filesharingClient)
+	http.HandleFunc("/upload-chunk", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			handleUploadChuck(w, r, filesharingClient)
+			return
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+			return
+		}
+		handleUploadChuck(w, r, filesharingClient)
+	})
+
+	http.HandleFunc("/get-chunk", func(w http.ResponseWriter, r *http.Request) {
+		handleGetFileChunk(w, r, filesharingClient)
 	})
 
 	http.HandleFunc("/filesharing", func(w http.ResponseWriter, r *http.Request) {
 		serveUnifiedPage(w, r)
 	})
 
-	// Add route for the main page (root can redirect to the unified page)
 	http.HandleFunc("/app", func(w http.ResponseWriter, r *http.Request) {
 		serveUnifiedPage(w, r)
+	})
+
+	// Add route for direct file download links
+	http.HandleFunc("/download/", func(w http.ResponseWriter, r *http.Request) {
+		// Extract filename from URL path
+		filename := r.URL.Path[len("/download/"):]
+		if filename == "" {
+			http.Error(w, "Filename not provided", http.StatusBadRequest)
+			return
+		}
+
+		// Redirect to app page with filename parameter
+		redirectURL := fmt.Sprintf("/app?filename=%s", filename)
+		http.Redirect(w, r, redirectURL, http.StatusFound)
 	})
 
 	log.Println("Gateway HTTP server starting on port 8080...")

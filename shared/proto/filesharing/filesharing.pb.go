@@ -229,6 +229,222 @@ func (x *GetFileResponse) GetFileName() string {
 	return ""
 }
 
+type AddChunkRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileName      string                 `protobuf:"bytes,1,opt,name=FileName,proto3" json:"FileName,omitempty"`
+	ChunkData     []byte                 `protobuf:"bytes,2,opt,name=ChunkData,proto3" json:"ChunkData,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddChunkRequest) Reset() {
+	*x = AddChunkRequest{}
+	mi := &file_proto_filesharing_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddChunkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddChunkRequest) ProtoMessage() {}
+
+func (x *AddChunkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_filesharing_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddChunkRequest.ProtoReflect.Descriptor instead.
+func (*AddChunkRequest) Descriptor() ([]byte, []int) {
+	return file_proto_filesharing_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AddChunkRequest) GetFileName() string {
+	if x != nil {
+		return x.FileName
+	}
+	return ""
+}
+
+func (x *AddChunkRequest) GetChunkData() []byte {
+	if x != nil {
+		return x.ChunkData
+	}
+	return nil
+}
+
+type AddChunkResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=Success,proto3" json:"Success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=Message,proto3" json:"Message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddChunkResponse) Reset() {
+	*x = AddChunkResponse{}
+	mi := &file_proto_filesharing_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddChunkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddChunkResponse) ProtoMessage() {}
+
+func (x *AddChunkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_filesharing_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddChunkResponse.ProtoReflect.Descriptor instead.
+func (*AddChunkResponse) Descriptor() ([]byte, []int) {
+	return file_proto_filesharing_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *AddChunkResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *AddChunkResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type GetChunkRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileName      string                 `protobuf:"bytes,1,opt,name=FileName,proto3" json:"FileName,omitempty"`
+	ChunkIndex    int32                  `protobuf:"varint,2,opt,name=ChunkIndex,proto3" json:"ChunkIndex,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChunkRequest) Reset() {
+	*x = GetChunkRequest{}
+	mi := &file_proto_filesharing_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChunkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChunkRequest) ProtoMessage() {}
+
+func (x *GetChunkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_filesharing_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChunkRequest.ProtoReflect.Descriptor instead.
+func (*GetChunkRequest) Descriptor() ([]byte, []int) {
+	return file_proto_filesharing_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetChunkRequest) GetFileName() string {
+	if x != nil {
+		return x.FileName
+	}
+	return ""
+}
+
+func (x *GetChunkRequest) GetChunkIndex() int32 {
+	if x != nil {
+		return x.ChunkIndex
+	}
+	return 0
+}
+
+type GetChunkResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChunkData     []byte                 `protobuf:"bytes,1,opt,name=ChunkData,proto3" json:"ChunkData,omitempty"`
+	ChunkIndex    int32                  `protobuf:"varint,2,opt,name=ChunkIndex,proto3" json:"ChunkIndex,omitempty"`
+	IsLastChunk   bool                   `protobuf:"varint,3,opt,name=IsLastChunk,proto3" json:"IsLastChunk,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChunkResponse) Reset() {
+	*x = GetChunkResponse{}
+	mi := &file_proto_filesharing_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChunkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChunkResponse) ProtoMessage() {}
+
+func (x *GetChunkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_filesharing_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChunkResponse.ProtoReflect.Descriptor instead.
+func (*GetChunkResponse) Descriptor() ([]byte, []int) {
+	return file_proto_filesharing_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetChunkResponse) GetChunkData() []byte {
+	if x != nil {
+		return x.ChunkData
+	}
+	return nil
+}
+
+func (x *GetChunkResponse) GetChunkIndex() int32 {
+	if x != nil {
+		return x.ChunkIndex
+	}
+	return 0
+}
+
+func (x *GetChunkResponse) GetIsLastChunk() bool {
+	if x != nil {
+		return x.IsLastChunk
+	}
+	return false
+}
+
 var File_proto_filesharing_proto protoreflect.FileDescriptor
 
 const file_proto_filesharing_proto_rawDesc = "" +
@@ -247,12 +463,31 @@ const file_proto_filesharing_proto_rawDesc = "" +
 	"\bFileName\x18\x01 \x01(\tR\bFileName\"O\n" +
 	"\x0fGetFileResponse\x12 \n" +
 	"\vFileContent\x18\x01 \x01(\fR\vFileContent\x12\x1a\n" +
-	"\bFileName\x18\x02 \x01(\tR\bFileName2\xa5\x01\n" +
+	"\bFileName\x18\x02 \x01(\tR\bFileName\"K\n" +
+	"\x0fAddChunkRequest\x12\x1a\n" +
+	"\bFileName\x18\x01 \x01(\tR\bFileName\x12\x1c\n" +
+	"\tChunkData\x18\x02 \x01(\fR\tChunkData\"F\n" +
+	"\x10AddChunkResponse\x12\x18\n" +
+	"\aSuccess\x18\x01 \x01(\bR\aSuccess\x12\x18\n" +
+	"\aMessage\x18\x02 \x01(\tR\aMessage\"M\n" +
+	"\x0fGetChunkRequest\x12\x1a\n" +
+	"\bFileName\x18\x01 \x01(\tR\bFileName\x12\x1e\n" +
+	"\n" +
+	"ChunkIndex\x18\x02 \x01(\x05R\n" +
+	"ChunkIndex\"r\n" +
+	"\x10GetChunkResponse\x12\x1c\n" +
+	"\tChunkData\x18\x01 \x01(\fR\tChunkData\x12\x1e\n" +
+	"\n" +
+	"ChunkIndex\x18\x02 \x01(\x05R\n" +
+	"ChunkIndex\x12 \n" +
+	"\vIsLastChunk\x18\x03 \x01(\bR\vIsLastChunk2\xbb\x02\n" +
 	"\n" +
 	"FileUpload\x12O\n" +
 	"\n" +
 	"UploadFile\x12\x1e.filesharing.UploadFileRequest\x1a\x1f.filesharing.UploadFileResponse\"\x00\x12F\n" +
-	"\aGetFile\x12\x1b.filesharing.GetFileRequest\x1a\x1c.filesharing.GetFileResponse\"\x00B&Z$shared/proto/filesharing;filesharingb\x06proto3"
+	"\aGetFile\x12\x1b.filesharing.GetFileRequest\x1a\x1c.filesharing.GetFileResponse\"\x00\x12I\n" +
+	"\bAddChunk\x12\x1c.filesharing.AddChunkRequest\x1a\x1d.filesharing.AddChunkResponse\"\x00\x12I\n" +
+	"\bGetChunk\x12\x1c.filesharing.GetChunkRequest\x1a\x1d.filesharing.GetChunkResponse\"\x00B&Z$shared/proto/filesharing;filesharingb\x06proto3"
 
 var (
 	file_proto_filesharing_proto_rawDescOnce sync.Once
@@ -266,20 +501,28 @@ func file_proto_filesharing_proto_rawDescGZIP() []byte {
 	return file_proto_filesharing_proto_rawDescData
 }
 
-var file_proto_filesharing_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_proto_filesharing_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_proto_filesharing_proto_goTypes = []any{
 	(*UploadFileRequest)(nil),  // 0: filesharing.UploadFileRequest
 	(*UploadFileResponse)(nil), // 1: filesharing.UploadFileResponse
 	(*GetFileRequest)(nil),     // 2: filesharing.GetFileRequest
 	(*GetFileResponse)(nil),    // 3: filesharing.GetFileResponse
+	(*AddChunkRequest)(nil),    // 4: filesharing.AddChunkRequest
+	(*AddChunkResponse)(nil),   // 5: filesharing.AddChunkResponse
+	(*GetChunkRequest)(nil),    // 6: filesharing.GetChunkRequest
+	(*GetChunkResponse)(nil),   // 7: filesharing.GetChunkResponse
 }
 var file_proto_filesharing_proto_depIdxs = []int32{
 	0, // 0: filesharing.FileUpload.UploadFile:input_type -> filesharing.UploadFileRequest
 	2, // 1: filesharing.FileUpload.GetFile:input_type -> filesharing.GetFileRequest
-	1, // 2: filesharing.FileUpload.UploadFile:output_type -> filesharing.UploadFileResponse
-	3, // 3: filesharing.FileUpload.GetFile:output_type -> filesharing.GetFileResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
+	4, // 2: filesharing.FileUpload.AddChunk:input_type -> filesharing.AddChunkRequest
+	6, // 3: filesharing.FileUpload.GetChunk:input_type -> filesharing.GetChunkRequest
+	1, // 4: filesharing.FileUpload.UploadFile:output_type -> filesharing.UploadFileResponse
+	3, // 5: filesharing.FileUpload.GetFile:output_type -> filesharing.GetFileResponse
+	5, // 6: filesharing.FileUpload.AddChunk:output_type -> filesharing.AddChunkResponse
+	7, // 7: filesharing.FileUpload.GetChunk:output_type -> filesharing.GetChunkResponse
+	4, // [4:8] is the sub-list for method output_type
+	0, // [0:4] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -296,7 +539,7 @@ func file_proto_filesharing_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_filesharing_proto_rawDesc), len(file_proto_filesharing_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
