@@ -204,6 +204,12 @@ func handleGetFileChunk(w http.ResponseWriter, r *http.Request, client fileshari
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
 	w.Header().Set("Content-Type", "application/octet-stream")
+	// Add custom header to indicate if this is the last chunk
+	if res.IsLastChunk {
+		w.Header().Set("X-Is-Last-Chunk", "true")
+	} else {
+		w.Header().Set("X-Is-Last-Chunk", "false")
+	}
 	w.Write(res.ChunkData)
 }
 
@@ -226,7 +232,7 @@ func serveUnifiedPage(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// Set maximum message size to 6MB for gRPC clients
-	maxMsgSize := 6 * 1024 * 1024 // 6MB
+	maxMsgSize := 31 * 1024 * 1024 // 6MB
 
 	// Setup shortener connection
 	shortenerAddr := "shortener-service:50051"

@@ -498,8 +498,8 @@
         let uploadedFileUrl = null;
         let shortenedUrlData = null;
 
-        // Chunk size: 5.5MB
-        const CHUNK_SIZE = 5.5 * 1024 * 1024; // 5.5 MB in bytes
+        // Chunk size: 30MB
+        const CHUNK_SIZE = 30 * 1024 * 1024;
 
         // Check URL parameters for automatic download
         function checkForAutoDownload() {
@@ -995,9 +995,9 @@
                     const chunkData = await response.arrayBuffer();
                     chunks.push(new Uint8Array(chunkData));
 
-                    // For now, we'll assume it's the last chunk if the response is smaller than CHUNK_SIZE
-                    // In a real implementation, you'd parse response headers or response body to get IsLastChunk
-                    isLastChunk = chunkData.byteLength < CHUNK_SIZE;
+                    // Check if this is the last chunk using the header
+                    const isLastChunkHeader = response.headers.get('X-Is-Last-Chunk');
+                    isLastChunk = isLastChunkHeader === 'true';
                     chunkIndex++;
 
                     showToast(`Downloaded chunk ${chunkIndex}...`, 'success');
