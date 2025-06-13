@@ -492,6 +492,13 @@
         </div>
     </div>
 
+    <!-- Polyfill para Readable/WritableStream em Safari/Firefox -->
+    <script src="https://cdn.jsdelivr.net/npm/web-streams-polyfill@3/dist/ponyfill.min.js"></script>
+
+    <!-- StreamSaver cria window.streamSaver -->
+    <script src="https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSaver.min.js"></script>
+
+
     <script>
         let selectedFile = null;
         let selectedChunkFile = null;
@@ -972,77 +979,52 @@
             }
         }
 
-        // Download file in chunks and reassemble
+
+        streamSaver.mitm = '/streamsaver/mitm.html';
+
+        // ---- download em modo streaming ----
         async function downloadFileInChunks(fileName) {
-            const chunks = [];
+            const fileStream = streamSaver.createWriteStream(fileName);          // <-- cria stream p/ disco
+            const writer = fileStream.getWriter();
+
             let chunkIndex = 0;
             let isLastChunk = false;
+            let totalBytes = 0;
 
             while (!isLastChunk) {
-                try {
-                    console.log(`Downloading chunk ${chunkIndex + 1}...`);
+                console.log(`A sacar chunk ${chunkIndex + 1}…`);
 
-                    const response = await retryOperation(async () => {
-                        const response = await fetch(`/get-chunk?fileName=${encodeURIComponent(fileName)}&chunkIndex=${chunkIndex}`);
+                // tenta até conseguir (a tua retryOperation já faz exponencial back-off ou afins)
+                const response = await retryOperation(() =>
+                    fetch(`/get-chunk?fileName=${encodeURIComponent(fileName)}&chunkIndex=${chunkIndex}`)
+                        .then(r => {
+                            if (!r.ok) throw new Error(`Falhou o chunk ${chunkIndex + 1}: ${r.statusText}`);
+                            return r;
+                        })
+                );
 
-                        if (!response.ok) {
-                            throw new Error(`Failed to download chunk ${chunkIndex + 1}: ${response.statusText}`);
-                        }
+                // stream de leitura da resposta
+                const reader = response.body.getReader();
 
-                        return response;
-                    });
-
-                    const chunkData = await response.arrayBuffer();
-                    chunks.push(new Uint8Array(chunkData));
-
-                    // Check if this is the last chunk using the header
-                    const isLastChunkHeader = response.headers.get('X-Is-Last-Chunk');
-                    isLastChunk = isLastChunkHeader === 'true';
-                    chunkIndex++;
-
-                    showToast(`Downloaded chunk ${chunkIndex}...`, 'success');
-                } catch (error) {
-                    if (error.message.includes('chunk index out of range') ||
-                        error.message.includes('404') ||
-                        error.message.includes('Erro ao obter chunk')) {
-                        // Assume we've reached the end of chunks
-                        isLastChunk = true;
-                        break;
-                    }
-                    throw error;
+                // transfere o corpo em mini-chunks (~64 KB) directamente para o writer
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    await writer.write(value);   // grava num ficheiro temporário, sem ficar em memória
+                    totalBytes += value.length;
                 }
+
+                // o back-end diz quando chega ao fim
+                isLastChunk = response.headers.get('X-Is-Last-Chunk') === 'true';
+                chunkIndex++;
+
+                showToast(`Chunk ${chunkIndex} descarregado`, 'success');
             }
 
-            if (chunks.length === 0) {
-                throw new Error('No chunks downloaded');
-            }
-
-            // Calculate total size
-            const totalSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-
-            // Combine all chunks
-            const combinedData = new Uint8Array(totalSize);
-            let offset = 0;
-
-            for (const chunk of chunks) {
-                combinedData.set(chunk, offset);
-                offset += chunk.length;
-            }
-
-            // Create blob and download
-            const blob = new Blob([combinedData]);
-            const url = URL.createObjectURL(blob);
-
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            showToast(`File downloaded successfully! (${chunks.length} chunks, ${formatFileSize(totalSize)})`, 'success');
+            await writer.close();            // commit => o browser mostra a caixa “Guardar como…”
+            showToast(`Ficheiro guardado! (${chunkIndex} chunks, ${formatFileSize(totalBytes)})`, 'success');
         }
+
 
         // Copy to clipboard
         function copyToClipboard() {

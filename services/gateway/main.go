@@ -231,7 +231,6 @@ func serveUnifiedPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// Set maximum message size to 6MB for gRPC clients
 	maxMsgSize := 31 * 1024 * 1024 // 6MB
 
 	// Setup shortener connection
@@ -317,6 +316,34 @@ func main() {
 		// Redirect to app page with filename parameter
 		redirectURL := fmt.Sprintf("/app?filename=%s", filename)
 		http.Redirect(w, r, redirectURL, http.StatusFound)
+	})
+
+	http.HandleFunc("/streamsaver/mitm.html", func(w http.ResponseWriter, r *http.Request) {
+		staticDir := filepath.Join(".", "static")
+		filePath := filepath.Join(staticDir, "mitm.html")
+
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			log.Printf("File not found: %s", filePath)
+			http.Error(w, "Page not found", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		http.ServeFile(w, r, filePath)
+	})
+
+	http.HandleFunc("/streamsaver/sw.js", func(w http.ResponseWriter, r *http.Request) {
+		staticDir := filepath.Join(".", "static")
+		filePath := filepath.Join(staticDir, "sw.js")
+
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			log.Printf("File not found: %s", filePath)
+			http.Error(w, "Service worker not found", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		http.ServeFile(w, r, filePath)
 	})
 
 	log.Println("Gateway HTTP server starting on port 8080...")
