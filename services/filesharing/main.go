@@ -31,7 +31,7 @@ func (f *FilesharingService) UploadFile(ctx context.Context, req *filesharing.Up
 	if err != nil {
 		return nil, fmt.Errorf("error clearing file: %v", err)
 	}
-	log.Printf("Cleared file:", req.FileName)
+	log.Println("Cleared file:", req.FileName)
 
 	err = MinioImpl.AddChunkToFile(ctx, minioClient, "ficheiros", req.FileName, req.FileContent)
 	if err != nil {
@@ -39,7 +39,6 @@ func (f *FilesharingService) UploadFile(ctx context.Context, req *filesharing.Up
 	}
 	log.Printf("Added chunk to file %s", req.FileName)
 	res := &filesharing.UploadFileResponse{
-		FileURL:  req.CurrentUrl,
 		FileName: req.FileName,
 	}
 

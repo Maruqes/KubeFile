@@ -955,9 +955,7 @@
                     console.log(`Chunk ${chunkNumber} response:`, chunkResponseText);
                 }
 
-                // Get file URL from first response
-                const lines = firstResponseText.split('\n');
-                const fileUrl = lines.find(line => line.startsWith('File URL:'))?.replace('File URL: ', '');
+                const fileUrl = `${window.location.origin}/download/${encodeURIComponent(fileName)}`;
                 uploadedFileUrl = fileUrl;
 
                 document.getElementById('uploadedFileInfo').textContent = `File: ${fileName} (${formatFileSize(fileSize)}) - Uploaded in ${totalChunks} chunks`;

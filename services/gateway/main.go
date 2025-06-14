@@ -50,6 +50,7 @@ func askForShortURL(w http.ResponseWriter, r *http.Request, client shortener.Sho
 		return
 	}
 	w.Write([]byte(url_final.UUID))
+	return
 }
 
 func getMainUrl(w http.ResponseWriter, r *http.Request, client shortener.ShortenerClient) {
@@ -116,7 +117,7 @@ func handleUploadFile(w http.ResponseWriter, r *http.Request, client filesharing
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "File uploaded successfully: %s\nFile URL: %s", res.FileName, res.FileURL)
+	fmt.Fprintf(w, "File uploaded successfully: %s\n", res.FileName)
 }
 
 func handleUploadChuck(w http.ResponseWriter, r *http.Request, client filesharing.FileUploadClient) {

@@ -18,7 +18,6 @@ message UploadFileRequest {
 }
 
 message UploadFileResponse {
-  string FileURL = 1;
   string FileName = 2;
 }
 
