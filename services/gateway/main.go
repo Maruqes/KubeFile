@@ -164,6 +164,28 @@ func handleUploadChuck(w http.ResponseWriter, r *http.Request, client filesharin
 	fmt.Fprintf(w, "Chunk uploaded successfully: %s\nMessage: %s", filename, res.Message)
 }
 
+func handleGetStorageInfo(w http.ResponseWriter, r *http.Request, client filesharing.FileUploadClient) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	res, err := client.GetStorageInfo(r.Context(), &filesharing.GetStorageInfoRequest{})
+	if err != nil {
+		http.Error(w, "Erro ao obter informações de armazenamento", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"totalSize": %d, "usedSize": %d}`, res.TotalSize, res.UsedSize)
+}
+
 func handleGetFileChunk(w http.ResponseWriter, r *http.Request, client filesharing.FileUploadClient) {
 	// Add CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -269,10 +291,6 @@ func main() {
 	})
 
 	http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "OPTIONS" {
-			handleUploadFile(w, r, filesharingClient)
-			return
-		}
 		if r.Method != http.MethodPost {
 			http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
 			return
@@ -290,6 +308,10 @@ func main() {
 			return
 		}
 		handleUploadChuck(w, r, filesharingClient)
+	})
+
+	http.HandleFunc("/get-storage-info", func(w http.ResponseWriter, r *http.Request) {
+		handleGetStorageInfo(w, r, filesharingClient)
 	})
 
 	http.HandleFunc("/get-chunk", func(w http.ResponseWriter, r *http.Request) {

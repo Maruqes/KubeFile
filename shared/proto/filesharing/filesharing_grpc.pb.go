@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	FileUpload_UploadFile_FullMethodName = "/filesharing.FileUpload/UploadFile"
-	FileUpload_AddChunk_FullMethodName   = "/filesharing.FileUpload/AddChunk"
-	FileUpload_GetChunk_FullMethodName   = "/filesharing.FileUpload/GetChunk"
+	FileUpload_UploadFile_FullMethodName     = "/filesharing.FileUpload/UploadFile"
+	FileUpload_AddChunk_FullMethodName       = "/filesharing.FileUpload/AddChunk"
+	FileUpload_GetChunk_FullMethodName       = "/filesharing.FileUpload/GetChunk"
+	FileUpload_GetStorageInfo_FullMethodName = "/filesharing.FileUpload/GetStorageInfo"
 )
 
 // FileUploadClient is the client API for FileUpload service.
@@ -31,6 +32,7 @@ type FileUploadClient interface {
 	UploadFile(ctx context.Context, in *UploadFileRequest, opts ...grpc.CallOption) (*UploadFileResponse, error)
 	AddChunk(ctx context.Context, in *AddChunkRequest, opts ...grpc.CallOption) (*AddChunkResponse, error)
 	GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkResponse, error)
+	GetStorageInfo(ctx context.Context, in *GetStorageInfoRequest, opts ...grpc.CallOption) (*GetStorageInfoResponse, error)
 }
 
 type fileUploadClient struct {
@@ -71,6 +73,16 @@ func (c *fileUploadClient) GetChunk(ctx context.Context, in *GetChunkRequest, op
 	return out, nil
 }
 
+func (c *fileUploadClient) GetStorageInfo(ctx context.Context, in *GetStorageInfoRequest, opts ...grpc.CallOption) (*GetStorageInfoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetStorageInfoResponse)
+	err := c.cc.Invoke(ctx, FileUpload_GetStorageInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FileUploadServer is the server API for FileUpload service.
 // All implementations must embed UnimplementedFileUploadServer
 // for forward compatibility
@@ -78,6 +90,7 @@ type FileUploadServer interface {
 	UploadFile(context.Context, *UploadFileRequest) (*UploadFileResponse, error)
 	AddChunk(context.Context, *AddChunkRequest) (*AddChunkResponse, error)
 	GetChunk(context.Context, *GetChunkRequest) (*GetChunkResponse, error)
+	GetStorageInfo(context.Context, *GetStorageInfoRequest) (*GetStorageInfoResponse, error)
 	mustEmbedUnimplementedFileUploadServer()
 }
 
@@ -93,6 +106,9 @@ func (UnimplementedFileUploadServer) AddChunk(context.Context, *AddChunkRequest)
 }
 func (UnimplementedFileUploadServer) GetChunk(context.Context, *GetChunkRequest) (*GetChunkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
+}
+func (UnimplementedFileUploadServer) GetStorageInfo(context.Context, *GetStorageInfoRequest) (*GetStorageInfoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetStorageInfo not implemented")
 }
 func (UnimplementedFileUploadServer) mustEmbedUnimplementedFileUploadServer() {}
 
@@ -161,6 +177,24 @@ func _FileUpload_GetChunk_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FileUpload_GetStorageInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetStorageInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FileUploadServer).GetStorageInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FileUpload_GetStorageInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileUploadServer).GetStorageInfo(ctx, req.(*GetStorageInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // FileUpload_ServiceDesc is the grpc.ServiceDesc for FileUpload service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -179,6 +213,10 @@ var FileUpload_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetChunk",
 			Handler:    _FileUpload_GetChunk_Handler,
+		},
+		{
+			MethodName: "GetStorageInfo",
+			Handler:    _FileUpload_GetStorageInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

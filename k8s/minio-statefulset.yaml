@@ -5,6 +5,19 @@ metadata:
 
 ---
 apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+  namespace: minio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi
+
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: minio-service
@@ -60,4 +73,5 @@ spec:
               mountPath: /data
       volumes:
         - name: minio-data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: minio-pvc

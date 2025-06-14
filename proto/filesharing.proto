@@ -8,6 +8,7 @@ service FileUpload {
   rpc UploadFile (UploadFileRequest) returns (UploadFileResponse) {}
   rpc AddChunk (AddChunkRequest) returns (AddChunkResponse) {}
   rpc GetChunk (GetChunkRequest) returns (GetChunkResponse) {}
+  rpc GetStorageInfo (GetStorageInfoRequest) returns (GetStorageInfoResponse) {}
 }
 
 message UploadFileRequest {
@@ -38,4 +39,13 @@ message GetChunkResponse {
   bytes ChunkData = 1;
   int32 ChunkIndex = 2;
   bool IsLastChunk = 3;
+}
+
+message GetStorageInfoRequest{
+
+}
+
+message GetStorageInfoResponse {
+  int64 TotalSize = 1; 
+  int64 UsedSize = 2;
 }
