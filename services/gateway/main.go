@@ -42,21 +42,14 @@ func askForShortURL(w http.ResponseWriter, r *http.Request, client shortener.Sho
 		return
 	}
 
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	baseURL := scheme + "://" + r.Host
-
 	url_final, err := client.ShortURL(r.Context(), &shortener.ShortURLRequest{
-		BaseURL:     baseURL,
 		OriginalURL: url,
 	})
 	if err != nil {
 		http.Error(w, "Erro ao encurtar URL", http.StatusInternalServerError)
 		return
 	}
-	w.Write([]byte(url_final.ShortURL))
+	w.Write([]byte(url_final.UUID))
 }
 
 func getMainUrl(w http.ResponseWriter, r *http.Request, client shortener.ShortenerClient) {

@@ -30,7 +30,7 @@ func (s *ShortenerService) ShortURL(ctx context.Context, req *shortener.ShortURL
 		log.Fatalf("Error setting key: %v", err)
 	}
 	return &shortener.ShortURLResponse{
-		ShortURL: req.BaseURL + "/geturl?uuid=" + cur_uuid,
+		UUID: cur_uuid,
 	}, nil
 }
 

@@ -748,7 +748,9 @@
                 const response = await fetch(`/short?url=${encodeURIComponent(url)}`);
 
                 if (response.ok) {
-                    const shortUrl = await response.text();
+                    const UUID = await response.text();
+
+                    const shortUrl = `${window.location.origin}/geturl?uuid=${UUID}`;
 
                     shortenedUrlData = {
                         original: url,

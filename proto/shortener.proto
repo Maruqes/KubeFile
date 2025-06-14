@@ -10,12 +10,11 @@ service Shortener {
 }
 
 message ShortURLRequest {
-  string BaseURL = 1;
   string OriginalURL = 2;
 }
 
 message ShortURLResponse {
-  string ShortURL = 1;
+  string UUID = 1;
 }
 
 message ResolveURLRequest {
