@@ -63,6 +63,15 @@ func (f *FilesharingService) GetChunk(ctx context.Context, req *filesharing.GetC
 	// Build chunk object name based on index
 	chunkObjectName := req.FileName + "_chunk_" + fmt.Sprintf("%d", req.ChunkIndex)
 
+	//check if the chunk exists
+	_, err := minioClient.StatObject(ctx, "ficheiros", chunkObjectName, minio.StatObjectOptions{})
+	if err != nil {
+		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+			return nil, fmt.Errorf("chunk %s does not exist", chunkObjectName)
+		}
+		return nil, fmt.Errorf("error checking chunk existence: %v", err)
+	}
+
 	object, err := minioClient.GetObject(ctx, "ficheiros", chunkObjectName, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting chunk from MinIO: %v", err)

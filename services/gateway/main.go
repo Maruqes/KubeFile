@@ -214,7 +214,7 @@ func handleGetFileChunk(w http.ResponseWriter, r *http.Request, client fileshari
 	})
 
 	if err != nil {
-		http.Error(w, "Erro ao obter chunk do ficheiro", http.StatusInternalServerError)
+		http.Error(w, "Erro ao obter chunk do ficheiro "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
