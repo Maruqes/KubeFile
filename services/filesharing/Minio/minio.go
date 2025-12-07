@@ -105,7 +105,7 @@ func getEnv(key, fallback string) string {
 }
 
 func InitializeMinIO(ctx context.Context) (*minio.Client, error) {
-	endpoint := getEnv("MINIO_ENDPOINT", "minio-service.minio:9000")
+	endpoint := getEnv("MINIO_ENDPOINT", "minio-service:9000")
 	accessKey := getEnv("MINIO_ACCESS_KEY", "MINIO_ACCESS_KEY")
 	secretKey := getEnv("MINIO_SECRET_KEY", "MINIO_SECRET_KEY")
 	useSSL := os.Getenv("MINIO_USE_SSL") == "true"
