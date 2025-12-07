@@ -245,11 +245,18 @@ func serveUnifiedPage(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, filePath)
 }
 
+func getEnv(key, fallback string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return fallback
+}
+
 func main() {
 	maxMsgSize := 31 * 1024 * 1024 // 6MB
 
 	// Setup shortener connection
-	shortenerAddr := "shortener-service:50051"
+	shortenerAddr := getEnv("SHORTENER_SERVICE_ADDR", "shortener-service.kubefile.svc.cluster.local:50051")
 	shortenerConn, err := grpc.NewClient(shortenerAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize), grpc.MaxCallSendMsgSize(maxMsgSize)))
@@ -260,7 +267,7 @@ func main() {
 	shortenerClient := shortener.NewShortenerClient(shortenerConn)
 
 	// Setup filesharing connection
-	filesharingAddr := "filesharing-service:50052"
+	filesharingAddr := getEnv("FILESHARING_SERVICE_ADDR", "filesharing-service.kubefile.svc.cluster.local:50052")
 	filesharingConn, err := grpc.NewClient(filesharingAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize), grpc.MaxCallSendMsgSize(maxMsgSize)))

@@ -22,9 +22,9 @@ spec:
         - containerPort: 50052
         env:
         - name: REDIS_ADDR
-          value: "redis-service:6379"
+          value: "redis-service.kubefile.svc.cluster.local:6379"
         - name: MINIO_ENDPOINT
-          value: "minio-service:9000"
+          value: "minio-service.kubefile.svc.cluster.local:9000"
         - name: MINIO_ACCESS_KEY
           value: "MINIO_ACCESS_KEY"
         - name: MINIO_SECRET_KEY

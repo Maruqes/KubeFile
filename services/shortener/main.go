@@ -68,7 +68,7 @@ func connectRedis(ctx context.Context, addr string, attempts int, delay time.Dur
 func main() {
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
-		redisAddr = "redis-service:6379"
+		redisAddr = "redis-service.kubefile.svc.cluster.local:6379"
 	}
 	client, err := connectRedis(ctx, redisAddr, 60, 2*time.Second)
 	if err != nil {
