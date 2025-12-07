@@ -134,12 +134,15 @@ func setupBucket(minioClient *minio.Client) error {
 }
 
 func main() {
-	minioClient = MinioImpl.InitializeMinIO()
-	if minioClient == nil {
-		log.Fatalf("failed to initialize MinIO client")
+	ctx := context.Background()
+
+	var err error
+	minioClient, err = MinioImpl.InitializeMinIO(ctx)
+	if err != nil {
+		log.Fatalf("failed to initialize MinIO client: %v", err)
 	}
 
-	if err := setupBucket(minioClient); err != nil {
+	if err = setupBucket(minioClient); err != nil {
 		log.Fatalf("bucket setup failed: %v", err)
 	}
 

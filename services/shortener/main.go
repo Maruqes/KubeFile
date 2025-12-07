@@ -70,7 +70,7 @@ func main() {
 	if redisAddr == "" {
 		redisAddr = "redis-service:6379"
 	}
-	client, err := connectRedis(ctx, redisAddr, 10, 2*time.Second)
+	client, err := connectRedis(ctx, redisAddr, 60, 2*time.Second)
 	if err != nil {
 		log.Fatalf("Redis connection failed: %v", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/Maruqes/KubeFile/shared/proto/filesharing"
@@ -96,45 +97,51 @@ func GetStorageLimitsData(ctx context.Context, minioClient *minio.Client) (files
 	}, nil
 }
 
-func InitializeMinIO() *minio.Client {
-	// MinIO configuration with hardcoded values
-	endpoint := "minio-service.minio:9000"
-	accessKey := "MINIO_ACCESS_KEY"
-	secretKey := "MINIO_SECRET_KEY"
-	useSSL := false
+func getEnv(key, fallback string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return fallback
+}
+
+func InitializeMinIO(ctx context.Context) (*minio.Client, error) {
+	endpoint := getEnv("MINIO_ENDPOINT", "minio-service.minio:9000")
+	accessKey := getEnv("MINIO_ACCESS_KEY", "MINIO_ACCESS_KEY")
+	secretKey := getEnv("MINIO_SECRET_KEY", "MINIO_SECRET_KEY")
+	useSSL := os.Getenv("MINIO_USE_SSL") == "true"
+
+	const attempts = 70
+	const delay = 2 * time.Second
 
 	log.Printf("Attempting to connect to MinIO at: %s", endpoint)
 
-	// Create MinIO client with retry logic
 	var minioClient *minio.Client
 	var err error
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < attempts; i++ {
 		minioClient, err = minio.New(endpoint, &minio.Options{
 			Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 			Secure: useSSL,
 		})
 		if err != nil {
-			log.Printf("Failed to create MinIO client (attempt %d/10): %v", i+1, err)
-			time.Sleep(2 * time.Second)
+			log.Printf("Failed to create MinIO client (attempt %d/%d): %v", i+1, attempts, err)
+			time.Sleep(delay)
 			continue
 		}
 
-		// Test connection
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		buckets, err := minioClient.ListBuckets(ctx)
+		connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		buckets, err := minioClient.ListBuckets(connectCtx)
 		cancel()
 
 		if err != nil {
-			log.Printf("Failed to connect to MinIO (attempt %d/10): %v", i+1, err)
-			time.Sleep(2 * time.Second)
+			log.Printf("Failed to connect to MinIO (attempt %d/%d): %v", i+1, attempts, err)
+			time.Sleep(delay)
 			continue
 		}
 
 		log.Printf("✅ Connected to MinIO successfully! Found %d buckets", len(buckets))
-		return minioClient
+		return minioClient, nil
 	}
 
-	log.Printf("⚠️  Warning: Could not connect to MinIO after 10 attempts. Service will continue without MinIO.")
-	return nil
+	return nil, fmt.Errorf("could not connect to MinIO after %d attempts", attempts)
 }
