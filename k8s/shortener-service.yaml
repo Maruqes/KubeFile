@@ -16,13 +16,13 @@ spec:
     spec:
       containers:
       - name: shortener-service
-        image: shortener-service:latest
+        image: ghcr.io/maruqes/shortener-service:latest
         ports:
         - containerPort: 50051
         env:
         - name: REDIS_ADDR
           value: "redis-service:6379"
-        imagePullPolicy: Never
+        imagePullPolicy: Always
         readinessProbe:
           tcpSocket:
             port: 50051

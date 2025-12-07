@@ -50,7 +50,6 @@ func askForShortURL(w http.ResponseWriter, r *http.Request, client shortener.Sho
 		return
 	}
 	w.Write([]byte(url_final.UUID))
-	return
 }
 
 func getMainUrl(w http.ResponseWriter, r *http.Request, client shortener.ShortenerClient) {

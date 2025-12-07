@@ -16,13 +16,13 @@ spec:
     spec:
       containers:
       - name: gateway-service
-        image: gateway-service:latest
+        image: ghcr.io/maruqes/gateway-service:latest
         ports:
         - containerPort: 8080
         env:
         - name: SHORTENER_SERVICE_ADDR
           value: "shortener-service:50051"
-        imagePullPolicy: Never
+        imagePullPolicy: Always
         readinessProbe:
           httpGet:
             path: /

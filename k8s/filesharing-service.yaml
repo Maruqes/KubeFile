@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: filesharing-service
-        image: filesharing-service:latest
+        image: ghcr.io/maruqes/filesharing-service:latest
         ports:
         - containerPort: 50052
         env:
@@ -28,7 +28,7 @@ spec:
           value: "MINIO_ACCESS_KEY"
         - name: MINIO_SECRET_KEY
           value: "MINIO_SECRET_KEY"
-        imagePullPolicy: Never
+        imagePullPolicy: Always
         readinessProbe:
           tcpSocket:
             port: 50052
