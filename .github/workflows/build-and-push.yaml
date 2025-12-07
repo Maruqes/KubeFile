@@ -12,7 +12,6 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: ${{ lower(github.repository_owner) }}
 
 jobs:
   build-and-push:
@@ -30,6 +29,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Normalize image namespace (lowercase owner)
+        run: echo "IMAGE_NAMESPACE=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
