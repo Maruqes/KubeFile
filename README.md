@@ -25,12 +25,6 @@ The project consists of several microservices:
 - **Redis**: Caching and session storage
 - **MinIO**: Object storage for files
 
-## 🚀 Live Demo
-
-The project is currently running at: **https://kubefile.maruqes.com:10513/app**
-
-*Note: This is hosted on an isolated VM solely for demonstration purposes and to show the project functionality.*
-
 ## 🛠️ Development Setup
 
 ### Prerequisites
