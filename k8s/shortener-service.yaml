@@ -23,27 +23,34 @@ spec:
         - name: REDIS_ADDR
           value: "redis-service:6379"
         imagePullPolicy: Always
+        startupProbe:
+          tcpSocket:
+            port: 50051
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
         readinessProbe:
           tcpSocket:
             port: 50051
-          initialDelaySeconds: 10
+          initialDelaySeconds: 15
           periodSeconds: 10
           timeoutSeconds: 5
-          failureThreshold: 3
+          failureThreshold: 5
         livenessProbe:
           tcpSocket:
             port: 50051
-          initialDelaySeconds: 15
+          initialDelaySeconds: 30
           periodSeconds: 20
           timeoutSeconds: 5
-          failureThreshold: 3
+          failureThreshold: 5
         resources:
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 200m
+            memory: 256Mi
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 1000m
+            memory: 1Gi
 ---
 apiVersion: v1
 kind: Service
