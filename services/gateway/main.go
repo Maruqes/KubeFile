@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/Maruqes/KubeFile/shared/proto/filesharing"
 	"github.com/Maruqes/KubeFile/shared/proto/shortener"
@@ -245,11 +246,84 @@ func serveUnifiedPage(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, filePath)
 }
 
+func serveLoginPage(w http.ResponseWriter, r *http.Request) {
+	staticDir := filepath.Join(".", "static")
+	filePath := filepath.Join(staticDir, "login.html")
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		http.Error(w, "Login page not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	http.ServeFile(w, r, filePath)
+}
+
 func getEnv(key, fallback string) string {
 	if val := os.Getenv(key); val != "" {
 		return val
 	}
 	return fallback
+}
+
+func setAuthCookie(w http.ResponseWriter, cookieName string) {
+	// Minimal cookie indicating authenticated session
+	c := &http.Cookie{
+		Name:     cookieName,
+		Value:    "ok",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  time.Now().Add(24 * time.Hour * 8),
+	}
+	http.SetCookie(w, c)
+}
+
+func isAuthenticated(r *http.Request, cookieName string) bool {
+	c, err := r.Cookie(cookieName)
+	if err != nil {
+		return false
+	}
+	return c.Value == "ok"
+}
+
+func authMiddleware(cookieName string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if isAuthenticated(r, cookieName) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Redirect unauthenticated users to login
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+func handleLogin(w http.ResponseWriter, r *http.Request, userEnv, passEnv, cookieName string) {
+	if r.Method == http.MethodGet {
+		serveLoginPage(w, r)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Expect application/x-www-form-urlencoded
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Pedido inválido", http.StatusBadRequest)
+		return
+	}
+	u := r.Form.Get("username")
+	p := r.Form.Get("password")
+
+	if u == userEnv && p == passEnv {
+		setAuthCookie(w, cookieName)
+		http.Redirect(w, r, "/app", http.StatusFound)
+		return
+	}
+	http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
 }
 
 func main() {
@@ -277,28 +351,33 @@ func main() {
 	defer filesharingConn.Close()
 	filesharingClient := filesharing.NewFileUploadClient(filesharingConn)
 
+	// Auth configuration from environment (hard-coded in YAML)
+	authUser := getEnv("AUTH_USERNAME", "")
+	authPass := getEnv("AUTH_PASSWORD", "")
+	sessionCookieName := getEnv("SESSION_COOKIE_NAME", "kubefile_session")
+
 	// Configure HTTP routes
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/app", http.StatusFound)
 	})
 
-	http.HandleFunc("/short", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/short", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
 		askForShortURL(w, r, shortenerClient)
-	})
+	}))
 
-	http.HandleFunc("/geturl", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/geturl", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
 		getMainUrl(w, r, shortenerClient)
-	})
+	}))
 
-	http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/upload", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
 			return
 		}
 		handleUploadFile(w, r, filesharingClient)
-	})
+	}))
 
-	http.HandleFunc("/upload-chunk", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/upload-chunk", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
 			handleUploadChuck(w, r, filesharingClient)
 			return
@@ -308,26 +387,26 @@ func main() {
 			return
 		}
 		handleUploadChuck(w, r, filesharingClient)
-	})
+	}))
 
-	http.HandleFunc("/get-storage-info", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/get-storage-info", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
 		handleGetStorageInfo(w, r, filesharingClient)
-	})
+	}))
 
-	http.HandleFunc("/get-chunk", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/get-chunk", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
 		handleGetFileChunk(w, r, filesharingClient)
-	})
+	}))
 
-	http.HandleFunc("/filesharing", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/filesharing", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
 		serveUnifiedPage(w, r)
-	})
+	}))
 
-	http.HandleFunc("/app", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/app", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
 		serveUnifiedPage(w, r)
-	})
+	}))
 
 	// Add route for direct file download links
-	http.HandleFunc("/download/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/download/", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
 		// Extract filename from URL path
 		filename := r.URL.Path[len("/download/"):]
 		if filename == "" {
@@ -338,9 +417,9 @@ func main() {
 		// Redirect to app page with filename parameter
 		redirectURL := fmt.Sprintf("/app?filename=%s", filename)
 		http.Redirect(w, r, redirectURL, http.StatusFound)
-	})
+	}))
 
-	http.HandleFunc("/streamsaver/mitm.html", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/streamsaver/mitm.html", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
 		staticDir := filepath.Join(".", "static")
 		filePath := filepath.Join(staticDir, "mitm.html")
 
@@ -352,9 +431,9 @@ func main() {
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		http.ServeFile(w, r, filePath)
-	})
+	}))
 
-	http.HandleFunc("/streamsaver/sw.js", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/streamsaver/sw.js", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
 		staticDir := filepath.Join(".", "static")
 		filePath := filepath.Join(staticDir, "sw.js")
 
@@ -366,6 +445,11 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 		http.ServeFile(w, r, filePath)
+	}))
+
+	// Login route (unprotected)
+	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		handleLogin(w, r, authUser, authPass, sessionCookieName)
 	})
 
 	log.Println("Gateway HTTP server starting on port 8080...")

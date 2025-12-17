@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Login</title>
+
+	<!-- Tailwind via CDN (simple) -->
+	<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+	<main class="w-full max-w-sm rounded-xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl">
+		<h1 class="text-xl font-semibold">Authentication</h1>
+		<p class="mt-2 text-sm text-slate-400">Enter your credentials to access the application.</p>
+
+		<form method="post" action="/login" id="loginForm" class="mt-5 space-y-4" novalidate>
+			<div>
+				<label for="username" class="block text-sm font-medium text-slate-200">Username</label>
+				<input id="username" name="username" type="text" autocomplete="username" required
+					class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder-slate-500 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20" />
+			</div>
+
+			<div>
+				<label for="password" class="block text-sm font-medium text-slate-200">Password</label>
+				<input id="password" name="password" type="password" autocomplete="current-password" required
+					class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder-slate-500 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20" />
+			</div>
+
+			<button type="submit"
+				class="w-full rounded-lg bg-blue-600 px-4 py-2.5 font-semibold text-white hover:bg-blue-500 active:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/30">
+				Sign in
+			</button>
+
+			<div id="error"
+				class="hidden rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-200"
+				role="alert" aria-live="polite">
+				Invalid credentials
+			</div>
+		</form>
+	</main>
+
+	<script>
+		const form = document.getElementById('loginForm');
+		const errorEl = document.getElementById('error');
+
+		form.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			errorEl.classList.add('hidden');
+
+			try {
+				const data = new URLSearchParams(new FormData(form));
+				const res = await fetch(form.action, {
+					method: 'POST',
+					body: data,
+					headers: { 'Accept': 'text/html' }
+				});
+
+				if (res.redirected) {
+					window.location.href = res.url;
+					return;
+				}
+
+				if (!res.ok) errorEl.classList.remove('hidden');
+			} catch {
+				errorEl.textContent = 'Network error. Please try again.';
+				errorEl.classList.remove('hidden');
+			}
+		});
+	</script>
+</body>
+
+</html>
