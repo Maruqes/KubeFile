@@ -19,7 +19,7 @@ KubeFile is a distributed application that showcases:
 
 The project consists of several microservices:
 
-- **Gateway Service** (Port 8080): HTTP gateway and web interface
+- **Gateway Service** (Port 8512): HTTP gateway and web interface
 - **File Sharing Service** (Port 50052): Handles file operations and storage
 - **URL Shortener Service** (Port 50051): Manages URL shortening
 - **Redis**: Caching and session storage
@@ -59,7 +59,7 @@ The project consists of several microservices:
    ```
 
 5. **Access the application**
-   - Web Interface: http://localhost:8080
+   - Web Interface: http://localhost:8512
    - Tilt Dashboard: http://localhost:10350
 
 ### Development Features

@@ -25,5 +25,5 @@ COPY --from=builder /app/shared ./shared/
 # Copy static files
 COPY services/gateway/static ./static/
 
-EXPOSE 8080
+EXPOSE 8512
 CMD ["./gateway-service"]

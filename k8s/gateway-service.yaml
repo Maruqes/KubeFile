@@ -19,7 +19,7 @@ spec:
       - name: gateway-service
         image: ghcr.io/maruqes/gateway-service:latest
         ports:
-        - containerPort: 8080
+        - containerPort: 8512
         env:
         - name: SHORTENER_SERVICE_ADDR
           value: "shortener-service.kubefile.svc.cluster.local:50051"
@@ -39,13 +39,13 @@ spec:
         readinessProbe:
           httpGet:
             path: /login
-            port: 8080
+            port: 8512
           initialDelaySeconds: 5
           periodSeconds: 5
         livenessProbe:
           httpGet:
             path: /login
-            port: 8080
+            port: 8512
           initialDelaySeconds: 10
           periodSeconds: 10
         resources:
@@ -65,8 +65,8 @@ spec:
   selector:
     app: gateway-service
   ports:
-  - port: 8080
-    targetPort: 8080
+  - port: 8512
+    targetPort: 8512
   type: LoadBalancer
 ---
 apiVersion: autoscaling/v2

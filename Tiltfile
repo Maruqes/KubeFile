@@ -124,7 +124,7 @@ k8s_resource(
 
 k8s_resource(
     'gateway-service', 
-    port_forwards='8080:8080',
+    port_forwards='8512:8512',
     auto_init=True,
     trigger_mode=TRIGGER_MODE_AUTO,
     resource_deps=['shortener-service', 'filesharing-service'],
