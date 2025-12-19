@@ -26,9 +26,9 @@ spec:
         - name: MINIO_ENDPOINT
           value: "minio-service.kubefile.svc.cluster.local:9000"
         - name: MINIO_ACCESS_KEY
-          value: "MINIO_ACCESS_KEY"
+          value: "kubefile" # managed by configure-minio.sh
         - name: MINIO_SECRET_KEY
-          value: "MINIO_SECRET_KEY"
+          value: "kube69k8s" # managed by configure-minio.sh
         - name: FILE_TTL_HOURS
           value: "120"
         imagePullPolicy: Always

@@ -11,7 +11,7 @@ spec:
   storageClassName: local-path
   resources:
     requests:
-      storage: 200Gi # managed by configure-minio.sh
+      storage: 600Gi # managed by configure-minio.sh
 
 ---
 apiVersion: v1
@@ -54,7 +54,7 @@ spec:
           image: quay.io/minio/minio:latest
           args:
             - server
-            - /data # managed by configure-minio.sh
+            - /mnt/512SvMan/shared/marques2673sv_hdd1tbwXLEeA # managed by configure-minio.sh
             - --address=:9000
             - --console-address=:9001
           ports:
@@ -62,12 +62,12 @@ spec:
             - containerPort: 9001
           env:
             - name: MINIO_ACCESS_KEY
-              value: "changeme-minio-user" # managed by configure-minio.sh
+              value: "kubefile" # managed by configure-minio.sh
             - name: MINIO_SECRET_KEY
-              value: "changeme-minio-password" # managed by configure-minio.sh
+              value: "kube69k8s" # managed by configure-minio.sh
           volumeMounts:
             - name: minio-data
-              mountPath: /data # managed by configure-minio.sh
+              mountPath: /mnt/512SvMan/shared/marques2673sv_hdd1tbwXLEeA # managed by configure-minio.sh
       volumes:
         - name: minio-data
           persistentVolumeClaim:

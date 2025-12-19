@@ -101,9 +101,15 @@ fi
 MANIFEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST_FILE="${MANIFEST_DIR}/minio-statefulset.yaml"
 GATEWAY_MANIFEST_FILE="${MANIFEST_DIR}/gateway-service.yaml"
+FILESHARING_MANIFEST_FILE="${MANIFEST_DIR}/filesharing-service.yaml"
 
 if [[ ! -f "$MANIFEST_FILE" ]]; then
 	echo "Error: manifest not found at ${MANIFEST_FILE}" >&2
+	exit 1
+fi
+
+if [[ ! -f "$FILESHARING_MANIFEST_FILE" ]]; then
+	echo "Error: manifest not found at ${FILESHARING_MANIFEST_FILE}" >&2
 	exit 1
 fi
 
@@ -113,7 +119,7 @@ if [[ -n "$AUTH_USER" ]] && [[ ! -f "$GATEWAY_MANIFEST_FILE" ]]; then
 fi
 
 export MINIO_USER MINIO_PASSWORD MINIO_DATA_PATH MINIO_SIZE_GI MANIFEST_FILE
-export AUTH_USER AUTH_PASSWORD AUTH_SECRET GATEWAY_MANIFEST_FILE
+export AUTH_USER AUTH_PASSWORD AUTH_SECRET GATEWAY_MANIFEST_FILE FILESHARING_MANIFEST_FILE
 
 python3 <<'PY'
 import os
@@ -123,6 +129,9 @@ import sys
 
 manifest_path = pathlib.Path(os.environ["MANIFEST_FILE"])
 contents = manifest_path.read_text(encoding="utf-8")
+
+filesharing_path = pathlib.Path(os.environ["FILESHARING_MANIFEST_FILE"])
+filesharing_contents = filesharing_path.read_text(encoding="utf-8")
 
 user = os.environ["MINIO_USER"]
 password = os.environ["MINIO_PASSWORD"]
@@ -171,6 +180,26 @@ apply(
 
 manifest_path.write_text(contents, encoding="utf-8")
 
+def apply_filesharing(pattern, repl, label):
+    global filesharing_contents
+    new_contents, count = re.subn(pattern, repl, filesharing_contents, count=1, flags=re.MULTILINE)
+    if count != 1:
+        sys.exit(f"Failed to update {label}; is the filesharing manifest structure unchanged?")
+    filesharing_contents = new_contents
+
+apply_filesharing(
+    r"(-\s+name:\s+MINIO_ACCESS_KEY\s*\n\s+value:\s+)" r'"[^"]+"' r"(\s+# managed by configure-minio\.sh)",
+    rf'\g<1>"{user_escaped}"\g<2>',
+    "filesharing MINIO_ACCESS_KEY",
+)
+apply_filesharing(
+    r"(-\s+name:\s+MINIO_SECRET_KEY\s*\n\s+value:\s+)" r'"[^"]+"' r"(\s+# managed by configure-minio\.sh)",
+    rf'\g<1>"{password_escaped}"\g<2>',
+    "filesharing MINIO_SECRET_KEY",
+)
+
+filesharing_path.write_text(filesharing_contents, encoding="utf-8")
+
 auth_user = os.environ.get("AUTH_USER")
 auth_password = os.environ.get("AUTH_PASSWORD")
 auth_secret = os.environ.get("AUTH_SECRET")
@@ -213,7 +242,7 @@ if auth_user and auth_password and auth_secret and gateway_manifest:
 PY
 
 if [[ -n "$AUTH_USER" ]]; then
-	echo "Updated ${MANIFEST_FILE} (MinIO) and ${GATEWAY_MANIFEST_FILE} (gateway auth)."
+	echo "Updated ${MANIFEST_FILE} (MinIO), ${FILESHARING_MANIFEST_FILE} (filesharing env), and ${GATEWAY_MANIFEST_FILE} (gateway auth)."
 else
-	echo "Updated ${MANIFEST_FILE} with user '${MINIO_USER}', custom data path '${MINIO_DATA_PATH}', and size ${MINIO_SIZE_GI}Gi."
+	echo "Updated ${MANIFEST_FILE} (MinIO) and ${FILESHARING_MANIFEST_FILE} (filesharing env) with user '${MINIO_USER}', custom data path '${MINIO_DATA_PATH}', and size ${MINIO_SIZE_GI}Gi."
 fi
