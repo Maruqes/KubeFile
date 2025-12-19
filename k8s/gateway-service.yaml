@@ -26,11 +26,11 @@ spec:
         - name: FILESHARING_SERVICE_ADDR
           value: "filesharing-service.kubefile.svc.cluster.local:50052"
         - name: AUTH_USERNAME
-          value: "admin"
+          value: "admin" # managed by configure-minio.sh
         - name: AUTH_PASSWORD
-          value: "admin123"
+          value: "admin123" # managed by configure-minio.sh
         - name: AUTH_SECRET
-          value: "change-me-to-a-long-random-auth-secret"
+          value: "change-me-to-a-long-random-auth-secret" # managed by configure-minio.sh
         - name: SESSION_COOKIE_NAME
           value: "kubefile_session"
         - name: COOKIE_SECURE
