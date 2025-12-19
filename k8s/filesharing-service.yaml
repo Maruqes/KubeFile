@@ -29,6 +29,8 @@ spec:
           value: "MINIO_ACCESS_KEY"
         - name: MINIO_SECRET_KEY
           value: "MINIO_SECRET_KEY"
+        - name: FILE_TTL_HOURS
+          value: "120"
         imagePullPolicy: Always
         startupProbe:
           tcpSocket:

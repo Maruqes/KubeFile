@@ -1,19 +1,28 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Maruqes/KubeFile/shared/proto/filesharing"
 	"github.com/Maruqes/KubeFile/shared/proto/shortener"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func isValidURL(url string, trying ...bool) string {
@@ -229,6 +238,83 @@ func handleGetFileChunk(w http.ResponseWriter, r *http.Request, client fileshari
 	w.Write(res.ChunkData)
 }
 
+func handlePublicDownload(w http.ResponseWriter, r *http.Request, client filesharing.FileUploadClient) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	rawName := strings.TrimPrefix(r.URL.Path, "/download/")
+	if rawName == "" {
+		http.Error(w, "Filename not provided", http.StatusBadRequest)
+		return
+	}
+
+	fileName, err := url.PathUnescape(rawName)
+	if err != nil {
+		http.Error(w, "Filename inválido", http.StatusBadRequest)
+		return
+	}
+	fileName = filepath.Base(fileName)
+	if fileName == "" || fileName == "." {
+		http.Error(w, "Filename inválido", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	flusher, _ := w.(http.Flusher)
+	chunkIndex := int32(0)
+
+	for {
+		res, err := client.GetChunk(r.Context(), &filesharing.GetChunkRequest{
+			FileName:   fileName,
+			ChunkIndex: chunkIndex,
+		})
+		if err != nil {
+			errMsg := strings.ToLower(err.Error())
+			if chunkIndex == 0 && (strings.Contains(errMsg, "does not exist") || strings.Contains(errMsg, "no such key") || strings.Contains(errMsg, "not provided")) {
+				http.Error(w, "Ficheiro não encontrado", http.StatusNotFound)
+				return
+			}
+
+			st, ok := status.FromError(err)
+			if ok {
+				switch st.Code() {
+				case codes.NotFound:
+					http.Error(w, "Ficheiro não encontrado", http.StatusNotFound)
+					return
+				case codes.DeadlineExceeded:
+					http.Error(w, "Pedido expirou", http.StatusGatewayTimeout)
+					return
+				}
+			}
+
+			log.Printf("Erro ao transferir ficheiro %s chunk %d: %v", fileName, chunkIndex, err)
+			http.Error(w, "Erro ao transferir ficheiro", http.StatusInternalServerError)
+			return
+		}
+
+		if len(res.ChunkData) > 0 {
+			if _, err := w.Write(res.ChunkData); err != nil {
+				log.Printf("Erro ao escrever chunk %d do ficheiro %s: %v", chunkIndex, fileName, err)
+				return
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+
+		if res.IsLastChunk {
+			break
+		}
+
+		chunkIndex++
+	}
+}
+
 func serveUnifiedPage(w http.ResponseWriter, r *http.Request) {
 	// Get the absolute path to the static file
 	staticDir := filepath.Join(".", "static")
@@ -266,31 +352,101 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func setAuthCookie(w http.ResponseWriter, cookieName string) {
-	// Minimal cookie indicating authenticated session
+func parseBoolEnv(key string, defaultVal bool) bool {
+	val := strings.TrimSpace(os.Getenv(key))
+	if val == "" {
+		return defaultVal
+	}
+	parsed, err := strconv.ParseBool(val)
+	if err != nil {
+		return defaultVal
+	}
+	return parsed
+}
+
+func validateCredentials(inputUser, inputPass, expectedUser, expectedPass string) bool {
+	userOK := subtle.ConstantTimeCompare([]byte(inputUser), []byte(expectedUser)) == 1
+	passOK := subtle.ConstantTimeCompare([]byte(inputPass), []byte(expectedPass)) == 1
+	return userOK && passOK
+}
+
+func generateSessionToken(username string, secret []byte, duration time.Duration) (string, error) {
+	nonce := make([]byte, 16)
+	if _, err := rand.Read(nonce); err != nil {
+		return "", err
+	}
+
+	exp := time.Now().Add(duration).Unix()
+	payload := fmt.Sprintf("%s|%d|%s", username, exp, base64.RawURLEncoding.EncodeToString(nonce))
+
+	mac := hmac.New(sha256.New, secret)
+	if _, err := mac.Write([]byte(payload)); err != nil {
+		return "", err
+	}
+	signature := mac.Sum(nil)
+
+	token := payload + "." + base64.RawURLEncoding.EncodeToString(signature)
+	return token, nil
+}
+
+func verifySessionToken(token string, secret []byte) bool {
+	parts := strings.SplitN(token, ".", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	payload, sigEncoded := parts[0], parts[1]
+
+	sig, err := base64.RawURLEncoding.DecodeString(sigEncoded)
+	if err != nil {
+		return false
+	}
+
+	mac := hmac.New(sha256.New, secret)
+	if _, err := mac.Write([]byte(payload)); err != nil {
+		return false
+	}
+	expectedSig := mac.Sum(nil)
+	if subtle.ConstantTimeCompare(expectedSig, sig) != 1 {
+		return false
+	}
+
+	payloadParts := strings.SplitN(payload, "|", 3)
+	if len(payloadParts) != 3 {
+		return false
+	}
+
+	expiryUnix, err := strconv.ParseInt(payloadParts[1], 10, 64)
+	if err != nil {
+		return false
+	}
+
+	return time.Now().Unix() <= expiryUnix
+}
+
+func setAuthCookie(w http.ResponseWriter, cookieName, token string, secure bool, duration time.Duration) {
 	c := &http.Cookie{
 		Name:     cookieName,
-		Value:    "ok",
+		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
-		Expires:  time.Now().Add(24 * time.Hour * 8),
+		Expires:  time.Now().Add(duration),
 	}
 	http.SetCookie(w, c)
 }
 
-func isAuthenticated(r *http.Request, cookieName string) bool {
+func isAuthenticated(r *http.Request, cookieName string, secret []byte) bool {
 	c, err := r.Cookie(cookieName)
 	if err != nil {
 		return false
 	}
-	return c.Value == "ok"
+	return verifySessionToken(c.Value, secret)
 }
 
-func authMiddleware(cookieName string, next http.HandlerFunc) http.HandlerFunc {
+func authMiddleware(cookieName string, secret []byte, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if isAuthenticated(r, cookieName) {
+		if isAuthenticated(r, cookieName, secret) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -299,7 +455,7 @@ func authMiddleware(cookieName string, next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func handleLogin(w http.ResponseWriter, r *http.Request, userEnv, passEnv, cookieName string) {
+func handleLogin(w http.ResponseWriter, r *http.Request, userEnv, passEnv, cookieName string, secret []byte, cookieSecure bool, sessionDuration time.Duration) {
 	if r.Method == http.MethodGet {
 		serveLoginPage(w, r)
 		return
@@ -310,7 +466,6 @@ func handleLogin(w http.ResponseWriter, r *http.Request, userEnv, passEnv, cooki
 		return
 	}
 
-	// Expect application/x-www-form-urlencoded
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Pedido inválido", http.StatusBadRequest)
 		return
@@ -318,16 +473,26 @@ func handleLogin(w http.ResponseWriter, r *http.Request, userEnv, passEnv, cooki
 	u := r.Form.Get("username")
 	p := r.Form.Get("password")
 
-	if u == userEnv && p == passEnv {
-		setAuthCookie(w, cookieName)
-		http.Redirect(w, r, "/app", http.StatusFound)
+	if !validateCredentials(u, p, userEnv, passEnv) {
+		http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
 		return
 	}
-	http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
+
+	token, err := generateSessionToken(u, secret, sessionDuration)
+	if err != nil {
+		log.Printf("error generating session token: %v", err)
+		http.Error(w, "Erro interno ao iniciar sessão", http.StatusInternalServerError)
+		return
+	}
+
+	secureFlag := cookieSecure || r.TLS != nil
+	setAuthCookie(w, cookieName, token, secureFlag, sessionDuration)
+	http.Redirect(w, r, "/app", http.StatusFound)
 }
 
 func main() {
 	maxMsgSize := 31 * 1024 * 1024 // 6MB
+	sessionDuration := 24 * time.Hour * 8
 
 	// Setup shortener connection
 	shortenerAddr := getEnv("SHORTENER_SERVICE_ADDR", "shortener-service.kubefile.svc.cluster.local:50051")
@@ -354,22 +519,34 @@ func main() {
 	// Auth configuration from environment (hard-coded in YAML)
 	authUser := getEnv("AUTH_USERNAME", "")
 	authPass := getEnv("AUTH_PASSWORD", "")
+	authSecret := getEnv("AUTH_SECRET", "")
+	if authUser == "" || authPass == "" {
+		log.Fatal("AUTH_USERNAME and AUTH_PASSWORD must be provided")
+	}
+	if len(authSecret) < 32 {
+		log.Fatal("AUTH_SECRET must be set (32+ characters recommended)")
+	}
 	sessionCookieName := getEnv("SESSION_COOKIE_NAME", "kubefile_session")
+	cookieSecure := parseBoolEnv("COOKIE_SECURE", false)
+	if !cookieSecure {
+		log.Println("WARNING: secure cookies are disabled; enable COOKIE_SECURE=true when serving over HTTPS")
+	}
+	secretBytes := []byte(authSecret)
 
 	// Configure HTTP routes
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/app", http.StatusFound)
 	})
 
-	http.HandleFunc("/short", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/short", authMiddleware(sessionCookieName, secretBytes, func(w http.ResponseWriter, r *http.Request) {
 		askForShortURL(w, r, shortenerClient)
 	}))
 
-	http.HandleFunc("/geturl", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/geturl", func(w http.ResponseWriter, r *http.Request) {
 		getMainUrl(w, r, shortenerClient)
-	}))
+	})
 
-	http.HandleFunc("/upload", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/upload", authMiddleware(sessionCookieName, secretBytes, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
 			return
@@ -377,7 +554,7 @@ func main() {
 		handleUploadFile(w, r, filesharingClient)
 	}))
 
-	http.HandleFunc("/upload-chunk", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/upload-chunk", authMiddleware(sessionCookieName, secretBytes, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
 			handleUploadChuck(w, r, filesharingClient)
 			return
@@ -389,37 +566,28 @@ func main() {
 		handleUploadChuck(w, r, filesharingClient)
 	}))
 
-	http.HandleFunc("/get-storage-info", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/get-storage-info", authMiddleware(sessionCookieName, secretBytes, func(w http.ResponseWriter, r *http.Request) {
 		handleGetStorageInfo(w, r, filesharingClient)
 	}))
 
-	http.HandleFunc("/get-chunk", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/get-chunk", authMiddleware(sessionCookieName, secretBytes, func(w http.ResponseWriter, r *http.Request) {
 		handleGetFileChunk(w, r, filesharingClient)
 	}))
 
-	http.HandleFunc("/filesharing", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/filesharing", authMiddleware(sessionCookieName, secretBytes, func(w http.ResponseWriter, r *http.Request) {
 		serveUnifiedPage(w, r)
 	}))
 
-	http.HandleFunc("/app", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/app", authMiddleware(sessionCookieName, secretBytes, func(w http.ResponseWriter, r *http.Request) {
 		serveUnifiedPage(w, r)
 	}))
 
-	// Add route for direct file download links
-	http.HandleFunc("/download/", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
-		// Extract filename from URL path
-		filename := r.URL.Path[len("/download/"):]
-		if filename == "" {
-			http.Error(w, "Filename not provided", http.StatusBadRequest)
-			return
-		}
+	// Public route for direct file downloads
+	http.HandleFunc("/download/", func(w http.ResponseWriter, r *http.Request) {
+		handlePublicDownload(w, r, filesharingClient)
+	})
 
-		// Redirect to app page with filename parameter
-		redirectURL := fmt.Sprintf("/app?filename=%s", filename)
-		http.Redirect(w, r, redirectURL, http.StatusFound)
-	}))
-
-	http.HandleFunc("/streamsaver/mitm.html", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/streamsaver/mitm.html", authMiddleware(sessionCookieName, secretBytes, func(w http.ResponseWriter, r *http.Request) {
 		staticDir := filepath.Join(".", "static")
 		filePath := filepath.Join(staticDir, "mitm.html")
 
@@ -433,7 +601,7 @@ func main() {
 		http.ServeFile(w, r, filePath)
 	}))
 
-	http.HandleFunc("/streamsaver/sw.js", authMiddleware(sessionCookieName, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/streamsaver/sw.js", authMiddleware(sessionCookieName, secretBytes, func(w http.ResponseWriter, r *http.Request) {
 		staticDir := filepath.Join(".", "static")
 		filePath := filepath.Join(staticDir, "sw.js")
 
@@ -449,7 +617,7 @@ func main() {
 
 	// Login route (unprotected)
 	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-		handleLogin(w, r, authUser, authPass, sessionCookieName)
+		handleLogin(w, r, authUser, authPass, sessionCookieName, secretBytes, cookieSecure, sessionDuration)
 	})
 
 	log.Println("Gateway HTTP server starting on port 8080...")

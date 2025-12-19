@@ -29,8 +29,12 @@ spec:
           value: "admin"
         - name: AUTH_PASSWORD
           value: "admin123"
+        - name: AUTH_SECRET
+          value: "change-me-to-a-long-random-auth-secret"
         - name: SESSION_COOKIE_NAME
           value: "kubefile_session"
+        - name: COOKIE_SECURE
+          value: "false"
         imagePullPolicy: Always
         readinessProbe:
           httpGet:

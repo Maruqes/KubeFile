@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	MinioImpl "github.com/Maruqes/KubeFile/services/filesharing/Minio"
@@ -133,6 +136,26 @@ func setupBucket(minioClient *minio.Client) error {
 	return nil
 }
 
+func getFileTTL() time.Duration {
+	const defaultTTL = 5 * 24 * time.Hour
+	val := strings.TrimSpace(os.Getenv("FILE_TTL_HOURS"))
+	if val == "" {
+		return defaultTTL
+	}
+
+	hours, err := strconv.Atoi(val)
+	if err != nil || hours <= 0 {
+		log.Printf("invalid FILE_TTL_HOURS value %q, using default %s", val, defaultTTL)
+		return defaultTTL
+	}
+
+	if hours < 1 {
+		hours = 1
+	}
+
+	return time.Duration(hours) * time.Hour
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -146,10 +169,12 @@ func main() {
 		log.Fatalf("bucket setup failed: %v", err)
 	}
 
-	// Start cleanup goroutine to remove objects older than 5 days
-	go func() {
-		ttl := 5 * 24 * time.Hour
-		ticker := time.NewTicker(24 * time.Hour)
+	fileTTL := getFileTTL()
+	log.Printf("File TTL set to %s", fileTTL)
+
+	// Start cleanup goroutine to remove objects older than configured TTL
+	go func(ttl time.Duration) {
+		ticker := time.NewTicker(time.Hour)
 		defer ticker.Stop()
 		for {
 			cleanStartCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -171,7 +196,7 @@ func main() {
 			cancel()
 			<-ticker.C
 		}
-	}()
+	}(fileTTL)
 
 	// Create a TCP listener on port 50052
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", 50052))
