@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: minio-pvc
+  name: minio-pvc # managed by configure-minio.sh
   namespace: kubefile
 spec:
   accessModes:
@@ -54,7 +54,7 @@ spec:
           image: quay.io/minio/minio:latest
           args:
             - server
-            - /mnt/512SvMan/shared/marques2673sv_hdd1tbwXLEeA # managed by configure-minio.sh
+            - /data
             - --address=:9000
             - --console-address=:9001
           ports:
@@ -67,8 +67,8 @@ spec:
               value: "kube69k8s" # managed by configure-minio.sh
           volumeMounts:
             - name: minio-data
-              mountPath: /mnt/512SvMan/shared/marques2673sv_hdd1tbwXLEeA # managed by configure-minio.sh
+              mountPath: /data
       volumes:
         - name: minio-data
           persistentVolumeClaim:
-            claimName: minio-pvc
+            claimName: minio-pvc # managed by configure-minio.sh

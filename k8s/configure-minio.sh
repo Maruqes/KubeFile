@@ -3,12 +3,12 @@ set -euo pipefail
 
 usage() {
 	cat <<'EOF'
-Usage: ./configure-minio.sh --user <username> --password <password> --data-path </absolute/path> --size <Gi> [options]
+Usage: ./configure-minio.sh --user <username> --password <password> --pvc-name <claim> --size <Gi> [options]
 
 Options:
   -u, --user             MinIO access key / username (required)
   -p, --password         MinIO secret key / password (required)
-  -d, --data-path        Absolute container path where the MinIO volume will be mounted (required)
+  -n, --pvc-name         PersistentVolumeClaim name to use (required)
   -s, --size             Requested PersistentVolumeClaim size in Gi (integer, required)
       --auth-user        Gateway AUTH_USERNAME value (requires all auth flags)
       --auth-password    Gateway AUTH_PASSWORD value (requires all auth flags)
@@ -22,7 +22,7 @@ EOF
 
 MINIO_USER=""
 MINIO_PASSWORD=""
-MINIO_DATA_PATH=""
+MINIO_PVC_NAME=""
 MINIO_SIZE_GI=""
 AUTH_USER=""
 AUTH_PASSWORD=""
@@ -38,8 +38,8 @@ while [[ $# -gt 0 ]]; do
 		MINIO_PASSWORD="${2:-}"
 		shift 2
 		;;
-	-d|--data-path)
-		MINIO_DATA_PATH="${2:-}"
+	-n|--pvc-name)
+		MINIO_PVC_NAME="${2:-}"
 		shift 2
 		;;
 	-s|--size)
@@ -70,19 +70,9 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-if [[ -z "$MINIO_USER" || -z "$MINIO_PASSWORD" || -z "$MINIO_DATA_PATH" || -z "$MINIO_SIZE_GI" ]]; then
-	echo "Error: --user, --password, --data-path and --size are required." >&2
+if [[ -z "$MINIO_USER" || -z "$MINIO_PASSWORD" || -z "$MINIO_PVC_NAME" || -z "$MINIO_SIZE_GI" ]]; then
+	echo "Error: --user, --password, --pvc-name and --size are required." >&2
 	usage
-	exit 1
-fi
-
-if [[ "$MINIO_DATA_PATH" != /* ]]; then
-	echo "Error: --data-path must be an absolute path inside the container (e.g. /data)." >&2
-	exit 1
-fi
-
-if [[ "$MINIO_DATA_PATH" =~ [[:space:]] ]]; then
-	echo "Error: --data-path cannot contain spaces." >&2
 	exit 1
 fi
 
@@ -118,7 +108,7 @@ if [[ -n "$AUTH_USER" ]] && [[ ! -f "$GATEWAY_MANIFEST_FILE" ]]; then
 	exit 1
 fi
 
-export MINIO_USER MINIO_PASSWORD MINIO_DATA_PATH MINIO_SIZE_GI MANIFEST_FILE
+export MINIO_USER MINIO_PASSWORD MINIO_PVC_NAME MINIO_SIZE_GI MANIFEST_FILE
 export AUTH_USER AUTH_PASSWORD AUTH_SECRET GATEWAY_MANIFEST_FILE FILESHARING_MANIFEST_FILE
 
 python3 <<'PY'
@@ -135,8 +125,8 @@ filesharing_contents = filesharing_path.read_text(encoding="utf-8")
 
 user = os.environ["MINIO_USER"]
 password = os.environ["MINIO_PASSWORD"]
-data_path = os.environ["MINIO_DATA_PATH"]
 size_gi = os.environ["MINIO_SIZE_GI"]
+pvc_name = os.environ["MINIO_PVC_NAME"]
 storage_value = f"{size_gi}Gi"
 
 def escape(value: str) -> str:
@@ -144,6 +134,7 @@ def escape(value: str) -> str:
 
 user_escaped = escape(user)
 password_escaped = escape(password)
+pvc_name_escaped = escape(pvc_name)
 
 def apply(pattern, repl, label):
     global contents
@@ -163,19 +154,19 @@ apply(
     "MinIO secret key",
 )
 apply(
-    r"(args:\s*\n\s*-\s*server\s*\n\s*-\s*)" r"[^\s]+" r"(\s+# managed by configure-minio\.sh)",
-    rf"\g<1>{data_path}\g<2>",
-    "MinIO data path (args)",
-)
-apply(
-    r"(-\s+name:\s+minio-data\s*\n\s+mountPath:\s+)" r"[^\s]+" r"(\s+# managed by configure-minio\.sh)",
-    rf"\g<1>{data_path}\g<2>",
-    "MinIO volume mount path",
-)
-apply(
     r"(storage:\s+)" r"[^\s]+" r"(\s+# managed by configure-minio\.sh)",
     rf"\g<1>{storage_value}\g<2>",
     "PersistentVolumeClaim size",
+)
+apply(
+    r"(name:\s+)" r"[^\s]+" r"(\s+# managed by configure-minio\.sh)",
+    rf'\g<1>{pvc_name_escaped}\g<2>',
+    "PersistentVolumeClaim name",
+)
+apply(
+    r"(claimName:\s+)" r"[^\s]+" r"(\s+# managed by configure-minio\.sh)",
+    rf'\g<1>{pvc_name_escaped}\g<2>',
+    "volume claim reference",
 )
 
 manifest_path.write_text(contents, encoding="utf-8")
@@ -244,5 +235,5 @@ PY
 if [[ -n "$AUTH_USER" ]]; then
 	echo "Updated ${MANIFEST_FILE} (MinIO), ${FILESHARING_MANIFEST_FILE} (filesharing env), and ${GATEWAY_MANIFEST_FILE} (gateway auth)."
 else
-	echo "Updated ${MANIFEST_FILE} (MinIO) and ${FILESHARING_MANIFEST_FILE} (filesharing env) with user '${MINIO_USER}', custom data path '${MINIO_DATA_PATH}', and size ${MINIO_SIZE_GI}Gi."
+	echo "Updated ${MANIFEST_FILE} (MinIO) and ${FILESHARING_MANIFEST_FILE} (filesharing env) with user '${MINIO_USER}', PVC '${MINIO_PVC_NAME}', and size ${MINIO_SIZE_GI}Gi."
 fi
