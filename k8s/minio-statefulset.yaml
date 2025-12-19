@@ -11,7 +11,7 @@ spec:
   storageClassName: local-path
   resources:
     requests:
-      storage: 600Gi # managed by configure-minio.sh
+      storage: 200Gi # managed by configure-minio.sh
 
 ---
 apiVersion: v1
