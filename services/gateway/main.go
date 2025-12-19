@@ -620,6 +620,12 @@ func main() {
 		handleLogin(w, r, authUser, authPass, sessionCookieName, secretBytes, cookieSecure, sessionDuration)
 	})
 
-	log.Println("Gateway HTTP server starting on port 8080...")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	port := os.Getenv("GATEWAY_PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	addr := fmt.Sprintf(":%s", port)
+	log.Printf("Gateway HTTP server starting on port %s...", port)
+	log.Fatal(http.ListenAndServe(addr, nil))
 }
