@@ -112,28 +112,28 @@ def apply(pattern, repl, label):
     contents = new_contents
 
 apply(
-    r"(-\s+name:\s+MINIO_ACCESS_KEY\s+\n\s+value:\s+)" r'"[^"]+"' r"(\s+# managed by configure-minio\.sh)",
-    rf'\1"{user_escaped}"\2',
+    r"(-\s+name:\s+MINIO_ACCESS_KEY\s*\n\s+value:\s+)" r'"[^"]+"' r"(\s+# managed by configure-minio\.sh)",
+    rf'\g<1>"{user_escaped}"\g<2>',
     "MinIO access key",
 )
 apply(
-    r"(-\s+name:\s+MINIO_SECRET_KEY\s+\n\s+value:\s+)" r'"[^"]+"' r"(\s+# managed by configure-minio\.sh)",
-    rf'\1"{password_escaped}"\2',
+    r"(-\s+name:\s+MINIO_SECRET_KEY\s*\n\s+value:\s+)" r'"[^"]+"' r"(\s+# managed by configure-minio\.sh)",
+    rf'\g<1>"{password_escaped}"\g<2>',
     "MinIO secret key",
 )
 apply(
     r"(args:\s*\n\s*-\s*server\s*\n\s*-\s*)" r"[^\s]+" r"(\s+# managed by configure-minio\.sh)",
-    rf"\1{data_path}\2",
+    rf"\g<1>{data_path}\g<2>",
     "MinIO data path (args)",
 )
 apply(
-    r"(-\s+name:\s+minio-data\s+\n\s+mountPath:\s+)" r"[^\s]+" r"(\s+# managed by configure-minio\.sh)",
-    rf"\1{data_path}\2",
+    r"(-\s+name:\s+minio-data\s*\n\s+mountPath:\s+)" r"[^\s]+" r"(\s+# managed by configure-minio\.sh)",
+    rf"\g<1>{data_path}\g<2>",
     "MinIO volume mount path",
 )
 apply(
     r"(storage:\s+)" r"[^\s]+" r"(\s+# managed by configure-minio\.sh)",
-    rf"\1{storage_value}\2",
+    rf"\g<1>{storage_value}\g<2>",
     "PersistentVolumeClaim size",
 )
 
