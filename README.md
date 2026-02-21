@@ -25,7 +25,7 @@ The project consists of several microservices:
 - **Redis**: Caching and session storage
 - **MinIO**: Object storage for files
 
-## 🛠️ Development Setup
+## Development Setup
 
 ### Prerequisites
 
