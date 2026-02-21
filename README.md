@@ -2,11 +2,11 @@
 
 A Kubernetes learning project demonstrating microservices architecture, file sharing, and URL shortening capabilities.
 
-## ⚠️ Educational Purpose Only
+## Educational Purpose Only
 
 **This project is designed exclusively for learning Kubernetes concepts and should NOT be used for production or any real-world applications.** It's a demonstration project to explore microservices, containerization, and Kubernetes orchestration.
 
-## 🎯 Project Overview
+## Project Overview
 
 KubeFile is a distributed application that showcases:
 - **Microservices Architecture**: Multiple services communicating via gRPC
@@ -15,7 +15,7 @@ KubeFile is a distributed application that showcases:
 - **Storage Management**: Integration with MinIO for object storage
 - **Real-time UI**: Modern web interface with progress indicators
 
-## 🏗️ Architecture
+## Architecture
 
 The project consists of several microservices:
 
@@ -69,7 +69,7 @@ The project consists of several microservices:
 - **Port Forwarding**: Direct access to all services
 - **Log Streaming**: Real-time logs from all services
 
-## 🌐 Production Deployment
+## Production Deployment
 
 The production environment runs on **k3s** (lightweight Kubernetes) on an isolated virtual machine. This setup demonstrates:
 
@@ -78,7 +78,7 @@ The production environment runs on **k3s** (lightweight Kubernetes) on an isolat
 - Persistent storage management
 - Load balancing and scaling
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 KubeFile/
@@ -92,11 +92,11 @@ KubeFile/
 └── go.mod            # Go module definition
 ```
 
-## 🧠 Learning Objectives
+## Learning Objectives
 
 This project demonstrates:
 
-## 🔧 Technologies Used
+## Technologies Used
 
 - **Go**: Backend services
 - **gRPC**: Service communication
@@ -108,7 +108,7 @@ This project demonstrates:
 - **Tilt**: Development automation
 - **Rancher Desktop**: Local Kubernetes
 
-## ⚡ Features
+## Features
 
 - **File Upload/Download**: Chunked file transfer with progress tracking
 - **URL Shortening**: Create and resolve short URLs
@@ -117,13 +117,13 @@ This project demonstrates:
 - **Progress Indicators**: Visual feedback for long operations
 - **Error Handling**: Robust error management and retry logic
 
-## 📝 Important Notes
+## Important Notes
 
 - **Security**: This is a learning project with minimal security measures
 - **Scalability**: Designed for demonstration, not high-load scenarios
 - **Data Persistence**: Data may be lost during development iterations
 
-## 📄 License
+## License
 
 This project is provided as-is for educational purposes. See LICENSE file for details.
 
